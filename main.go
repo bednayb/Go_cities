@@ -2,18 +2,22 @@ package main
 
 import (
 	"github.com/go-martini/martini"
-	"time"
 
+	"fmt"
+	"math"
 )
 
 
+//TODO put lat and lng to Geo
 type CityInfo struct {
-	City string
-	Geo map[string]float64
-	Temp [5]float64
-	Rain [5]float64
-    Timestamp time.Time
+	City string `json:"City"`
+	Lat float64 `json:"Lat"`
+	Lng float64 `json:"Lng"`
+	Temp []float64 `json:"Temp"`
+	Rain []float64 `json:"Rain"`
+	Timestamp int `json:"Timestamp"`
 }
+
 
 
 func main() {
@@ -38,3 +42,26 @@ func main() {
 
 	m.Run()
 }
+
+func check_distance(a float64, b float64 ) float64{
+	fmt.Println(math.Sqrt(a * a + b * b))
+	return math.Sqrt(a * a + b * b)
+}
+
+func find_biggest(array []float64) float64{
+	var n, biggest float64
+
+	for _,v:=range array {
+		if v>n {
+			n = v
+			biggest = n
+		}
+	}
+	return biggest
+}
+
+
+
+
+
+
