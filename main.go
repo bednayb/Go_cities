@@ -5,6 +5,11 @@ import (
 
 	"fmt"
 	"math"
+	//"net/http"
+
+	//"github.com/martini-contrib/render"
+	"github.com/martini-contrib/render"
+	"net/http"
 )
 
 
@@ -34,31 +39,53 @@ func main() {
 	})
 
 	// Here you can send your new data
-	m.Post("/push", func() {
+	m.Post("/push", func(r render.Render, city CityInfo) {
 		// create something
+		var retData struct{
+			City CityInfo
+		}
+
+		retData.City = city
+		r.JSON(http.StatusOK, city)
 	})
-
-
 
 	m.Run()
 }
 
+
 func check_distance(a float64, b float64 ) float64{
-	fmt.Println(math.Sqrt(a * a + b * b))
+
 	return math.Sqrt(a * a + b * b)
 }
 
-func find_biggest(array []float64) float64{
-	var n, biggest float64
 
+func find_biggest_and_smallest(array []float64) (float64, float64){
+	var n,k, smallest,biggest float64
+
+	n = array[0]
 	for _,v:=range array {
-		if v>n {
+		if v < n {
 			n = v
-			biggest = n
+			smallest = n
 		}
 	}
-	return biggest
+
+	for _,v:=range array {
+		if v > k {
+			k = v
+			biggest = k
+		}
+	}
+
+	return smallest, biggest
 }
+
+func balance(){
+
+}
+
+
+
 
 
 
