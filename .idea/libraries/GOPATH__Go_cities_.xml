@@ -1,0 +1,27 @@
+<component name="libraryTable">
+  <library name="GOPATH &lt;Go_cities&gt;">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/../.." />
+      <root url="file://$PROJECT_DIR$/../../../first_go" />
+      <root url="file://$PROJECT_DIR$/../../../golang.org" />
+      <root url="file://$PROJECT_DIR$/../../../zoliSuti" />
+      <root url="file://$PROJECT_DIR$/../../../basic_methods" />
+      <root url="file://$PROJECT_DIR$/../../../leetcode" />
+      <root url="file://$PROJECT_DIR$/../../../.idea" />
+      <root url="file://$PROJECT_DIR$/../../../udemy" />
+    </CLASSES>
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/../.." />
+      <root url="file://$PROJECT_DIR$/../../../first_go" />
+      <root url="file://$PROJECT_DIR$/../../../golang.org" />
+      <root url="file://$PROJECT_DIR$/../../../zoliSuti" />
+      <root url="file://$PROJECT_DIR$/../../../basic_methods" />
+      <root url="file://$PROJECT_DIR$/../../../leetcode" />
+      <root url="file://$PROJECT_DIR$/../../../.idea" />
+      <root url="file://$PROJECT_DIR$/../../../udemy" />
+    </SOURCES>
+    <excluded>
+      <root url="file://$PROJECT_DIR$" />
+    </excluded>
+  </library>
+</component>
