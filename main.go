@@ -1,28 +1,24 @@
 package main
 
 import (
-	"github.com/go-martini/martini"
+//"strconv"
 
-	//"fmt"
-	//"math"
-	//"net/http"
-
-	//"github.com/martini-contrib/render"
-	"github.com/martini-contrib/render"
-	"net/http"
-	"fmt"
+"github.com/gin-gonic/gin"
+"fmt"
 	"math"
+//"net/http"
 )
 
 
 //TODO put lat and lng to Geo
 type CityInfo struct {
-	City string `json:"City"`
-	Lat float64 `json:"Lat"`
-	Lng float64 `json:"Lng"`
-	Temp [5]float64 `json:"Temp"`
-	Rain [5]float64 `json:"Rain"`
-	Timestamp int `json:"Timestamp"`
+	City string `gorm:"not null" form:"City" json:"City"`
+	Lat float64 `gorm:"not null" form:"Lat" json:"Lat"`
+	Lng float64 `gorm:"not null" form:"Lng"json:"Lng"`
+	//Cordinate []float64
+	Temp [5]float64 `gorm:"not null" form:"Temp"json:"Temp"`
+	Rain [5]float64 `gorm:"not null" form:"Rain"json:"Rain"`
+	Timestamp int `gorm:"not null" form:"Timestamp"json:"Timestamp"`
 }
 
 type Cordinate struct {
@@ -30,54 +26,74 @@ type Cordinate struct {
 	Lng float64 `json:"Lng"`
 }
 
+var All_Cities = []CityInfo{
+	CityInfo{"bp",  2 ,3,[5]float64{20,3,17,5,6},[5]float64{2,3,4,5,6},43},
+	CityInfo{"becs",44,5,[5]float64{20,3,17,5,6},[5]float64{2,3,4,5,6},43},
+}
 
 
 func main() {
+	r := gin.Default()
 
-	///////////////// DATA /////////////////
-	a:= CityInfo{"bp",4,5,[5]float64{20,3,17,5,6},[5]float64{2,3,4,5,6},43}
-	b:= CityInfo{"bp",4,5,[5]float64{20,3,4,5,6},[5]float64{2,3,4,5,6},43}
-	//c:= CityInfo{"bp",2,1,[5]float64{20,3,4,5,6},[5]float64{2,3,4,5,6},43}
-	//d:= CityInfo{"bp",10,1,[5]float64{20,3,4,5,6},[5]float64{2,3,4,5,6},43}
-	//e:= CityInfo{"bp",10,1,[5]float64{20,3,4,5,6},[5]float64{2,3,4,5,6},43}
+	v1 := r.Group("api/v1")
+	{
 
+		v1.POST("/push", PostCity)
+		v1.GET("/cities", GetCities)
+		v1.GET("/cities/:name", GetCityName)
 
-	present_cord:= Cordinate{1,1}
-	///////////////// DATA /////////////////
-
-
-    distances:= check_distance(present_cord,[]CityInfo{a,b})
-	fmt.Println(distances)
+		v1.GET("/avg", GetCordinate)
 
 
+	}
 
-
-
-	m := martini.Classic()
-
-	// Here you can check a specific city  (not works yet)
-	m.Get("/list", func() string {
-		return " specific city data"
-	})
-
-	// Here you can check the forecast for a specific place (not works yet)
-	m.Get("/avg", func() string {
-		return "forecast"
-	})
-
-	// Here you can send your new data
-	m.Post("/push", func(r render.Render, city CityInfo) {
-		// create something
-		var retData struct{
-			City CityInfo
-		}
-
-		retData.City = city
-		r.JSON(http.StatusOK, city)
-	})
-
-	m.Run()
+	r.Run(":8080")
 }
+
+
+func GetCities(c *gin.Context) {
+
+	c.JSON(200, All_Cities)
+
+}
+
+func GetCityName(c *gin.Context) {
+	name := c.Params.ByName("name")
+
+	fmt.Println(name)
+	var redflag bool = true
+	for _,v := range All_Cities{
+		if v.City == name{
+			redflag = false
+			content := gin.H{ "city": v.City, "lat": v.Lat}
+			c.JSON(200, content)
+		}
+	}
+
+	if redflag{
+		content := gin.H{"error": "user with id#" + name + " not found"}
+		c.JSON(404, content)
+	}
+
+	// curl -i http://localhost:8080/api/v1/cities/bp
+}
+
+func PostCity(c *gin.Context) {
+	// The futur code…
+
+}
+
+func GetCordinate(c *gin.Context) {
+	lat := c.Query("lat")
+	lng:= c.Query("let")
+	timestamp:= c.Query("timestamp")
+
+	content := gin.H{  "lat": lat, "lng": lng, "timestamp":timestamp}
+	c.JSON(200, content)
+}
+
+
+
 
 
 
