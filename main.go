@@ -7,6 +7,8 @@ import (
 "fmt"
 	"math"
 //"net/http"
+	"strconv"
+	"strings"
 )
 
 
@@ -18,17 +20,20 @@ type CityInfo struct {
 	//Cordinate []float64
 	Temp [5]float64 `gorm:"not null" form:"Temp"json:"Temp"`
 	Rain [5]float64 `gorm:"not null" form:"Rain"json:"Rain"`
-	Timestamp int `gorm:"not null" form:"Timestamp"json:"Timestamp"`
+	Timestamp float64 `gorm:"not null" form:"Timestamp"json:"Timestamp"`
 }
 
-type Cordinate struct {
+type Cordinate_and_time struct {
 	Lat float64 `json:"Lat"`
 	Lng float64 `json:"Lng"`
+	Timestamp int64 `gorm:"not null" form:"Timestamp"json:"Timestamp"`
 }
 
 var All_Cities = []CityInfo{
-	CityInfo{"bp",  2 ,3,[5]float64{20,3,17,5,6},[5]float64{2,3,4,5,6},43},
-	CityInfo{"becs",44,5,[5]float64{20,3,17,5,6},[5]float64{2,3,4,5,6},43},
+	CityInfo{"bp",  99 ,99,[5]float64{20,3,17,5,6},[5]float64{0.2,0.6,0.4,0.5,0.6},43},
+	CityInfo{"becs",98,98,[5]float64{20,4,17,5,6},[5]float64{0.2,0.3,0.4,0.5,0.6},43},
+	CityInfo{"becs",97,97,[5]float64{20,5,17,5,6},[5]float64{0.2,0.3,0.4,0.5,0.6},43},
+	CityInfo{"becs",96,96,[5]float64{20,3,17,5,6},[5]float64{0.5,0.3,0.4,0.5,0.6},43},
 }
 
 
@@ -39,9 +44,9 @@ func main() {
 	{
 
 		v1.POST("/push", PostCity)
-		v1.GET("/cities", GetCities)
-		v1.GET("/cities/:name", GetCityName)
 
+		v1.GET("/cities", GetCities)
+		v1.GET("/city/:name", GetCityName)
 		v1.GET("/avg", GetCordinate)
 
 
@@ -65,13 +70,13 @@ func GetCityName(c *gin.Context) {
 	for _,v := range All_Cities{
 		if v.City == name{
 			redflag = false
-			content := gin.H{ "city": v.City, "lat": v.Lat}
+			content := gin.H{ "celsius next 5 days": v.Temp, "rainning chance next 5 days": v.Rain}
 			c.JSON(200, content)
 		}
 	}
 
 	if redflag{
-		content := gin.H{"error": "user with id#" + name + " not found"}
+		content := gin.H{"error": "city with name " + name + " not found"}
 		c.JSON(404, content)
 	}
 
@@ -84,31 +89,42 @@ func PostCity(c *gin.Context) {
 }
 
 func GetCordinate(c *gin.Context) {
-	lat := c.Query("lat")
-	lng:= c.Query("let")
-	timestamp:= c.Query("timestamp")
 
-	content := gin.H{  "lat": lat, "lng": lng, "timestamp":timestamp}
+	//Cordinate + time
+
+		lat := c.Query("lat")
+		lng := c.Query("lng")
+		timestamp := c.Query("timestamp")
+	//Convert to float64/int
+		lat_float64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
+		lng_float64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
+		timestamp_int, _:= strconv.ParseInt(timestamp, 10,64)
+	//put data to struct
+		var present_data = Cordinate_and_time{lat_float64,lng_float64,timestamp_int}
+
+	// count all distances
+	var distances []float64 = check_distance(present_data,All_Cities)
+
+	// check balance
+
+	var balance []float64 = check_balance(distances)
+
+	var forecast_celsius []float64  = calculate_temps(balance,All_Cities)
+	var forecast_rain []float64  = calculate_rain(balance,All_Cities)
+
+	var result [][]float64
+
+	result = append(result,forecast_celsius)
+	result = append(result, forecast_rain)
+
+	content := gin.H{ "expected celsius next 5 days": result[0], "expected rainning chance next 5 days": result[1]}
+
 	c.JSON(200, content)
 }
 
+func check_distance(cordinate Cordinate_and_time, info [] CityInfo) []float64{
 
-
-
-
-
-
-func check_distance(cordinate Cordinate, info [] CityInfo) float64{
-
-
-	//var total_temp float64
-	//var total_balance float64
-	//var balanced_temp float64
-	//var all_temp []float64
-
-
-	var avg_temp float64 = 1
-    distances:= []float64{}
+	var distances []float64
 
 	for _,info := range info {
 
@@ -118,88 +134,96 @@ func check_distance(cordinate Cordinate, info [] CityInfo) float64{
 		var distance float64
 		distance = math.Sqrt( math.Pow(dis_lat,2) + math.Pow(dis_lng,2))
 		distances = append(distances,distance)
-
 	}
 
-	//var balanced_numbers []float64
-	//balanced_numbers = balance(distances)
-	//
-	//
-	//fmt.Println(balanced_numbers)
-	//for j:=0; j < len(info); j++ {
-	//
-	//	total_temp  = 0
-	//	total_balance = 0
-	//	for i:= 0; i < 5; i++ {
-	//
-	//		fmt.Println(info[j].Temp[i])
-	//		balanced_temp = balanced_numbers[j] * info[i].Temp[j]
-	//		total_temp += balanced_temp
-	//		total_balance += balanced_numbers[j]
-	//	}
-	//	avg_temp = total_temp / total_balance
-	//	fmt.Println("avg")
-	//	fmt.Println(avg_temp)
-	//	all_temp = append(all_temp, avg_temp)
-	//}
-	//fmt.Println(all_temp)
-	////fmt.Println(total_temp)
-	////fmt.Println(total_balance)
-	//
-	//avg_temp = total_temp / total_balance
-	//fmt.Println(result)
-	return avg_temp
+	return distances
 }
 
+func check_balance(distances []float64) []float64{
 
-func find_biggest_and_smallest(array []float64) (a[2]float64){
-	var n,k, smallest,biggest float64
+	//return value
+	var balance_by_distance []float64
+	// append number to return value
+	var balance_number float64
 
-	n = array[0]
-	for _,v:=range array {
-		if v < n {
-			n = v
-			smallest = n
+	// find smallest
+	var permanent_smallest float64 = distances[0]
+	var smallest float64 = distances[0]
+
+		for _,v:=range distances {
+			if v < permanent_smallest {
+				permanent_smallest = v
+				smallest = permanent_smallest
+			}
+		}
+
+	// find biggest
+	var permanent_biggest float64
+	var biggest float64 =  distances[0]
+
+	for _,v:=range distances {
+		if v > permanent_biggest {
+			permanent_biggest = v
+			biggest = permanent_biggest
 		}
 	}
 
-	for _,v:=range array {
-		if v > k {
-			k = v
-			biggest = k
-		}
+
+
+
+	// calculate balance number
+	for _,v := range distances{
+
+		balance_number = (v - smallest) / (biggest-smallest)
+
+		balance_number -=1
+		balance_number *=-1
+
+		balance_by_distance = append(balance_by_distance,balance_number)
 	}
 
-	var result[2]float64
-	result[0] = biggest
-	result[1] = smallest
-	return result
+	return balance_by_distance
 }
 
-func balance( a []float64) (result []float64){
+func calculate_temps(balance []float64, info [] CityInfo) []float64 {
 
-	fmt.Println(a)
+	var forecast_celsius []float64
+	var total_balance float64
+	var total_temp float64
 
-	var big_and_small[2] float64
-	big_and_small = find_biggest_and_smallest(a)
 
 
-	for _,v := range a {
 
-		var balanced_number float64
-		balanced_number = v-big_and_small[1]
-		balanced_number /= big_and_small[0]
-
-		result = append(result,balanced_number)
-
+	// change to len
+	for c:=0; c < 5; c++ {
+		total_balance = 0
+		total_temp = 0
+		for i, v := range info {
+			total_balance += balance[i]
+			total_temp += v.Temp[c] * balance[i]
+		}
+		forecast_celsius = append(forecast_celsius, total_temp/total_balance)
 	}
+	return forecast_celsius
+}
 
-	fmt.Println(result)
+func calculate_rain(balance []float64, info [] CityInfo) []float64 {
 
+	var forecast_rain []float64
+	var total_balance float64
+	var total_temp float64
 
-
-
-	return result
+	// change to len
+	for c:=0; c < 5; c++ {
+		total_balance = 0
+		total_temp = 0
+		for i, v := range info {
+			total_balance += balance[i]
+			total_temp += v.Rain[c] * balance[i]
+		}
+		forecast_rain = append(forecast_rain, total_temp/total_balance)
+	}
+	return forecast_rain
 }
 
 
