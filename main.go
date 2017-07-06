@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
 )
 
 //TODO put lat and lng to Geo
@@ -208,6 +209,10 @@ func calculate_rain(balance []float64, info []CityInfo) []float64 {
 }
 
 func PostCity(c *gin.Context) {
-	// The futur code…
+
+	var new_city CityInfo
+	new_city = CityInfo{"koln", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 43}
+	All_Cities = append(All_Cities,new_city)
+
 
 }
