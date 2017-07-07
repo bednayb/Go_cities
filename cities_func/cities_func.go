@@ -1,73 +1,20 @@
-package main
+package cities_func
 
 import (
 	//"fmt"
 	"github.com/gin-gonic/gin"
+	//"sort"
+	"fmt"
+	"github.com/bednayb/Go_cities/city_structs"
+	"github.com/bednayb/Go_cities/mock_data"
 	"math"
 	"strconv"
 	"strings"
-	"time"
 	"sort"
-	"fmt"
-
 )
 
-//TODO put lat and lng to Geo
-type CityInfo struct {
-	City string  `gorm:"not null" form:"City" json:"City"`
-	Geo Geo
-	Temp      [5]float64 `gorm:"not null" form:"Temp"json:"Temp"`
-	Rain      [5]float64 `gorm:"not null" form:"Rain"json:"Rain"`
-	Timestamp int64    `gorm:"not null" form:"Timestamp"json:"Timestamp"`
-}
-
-type CitiesInfo []CityInfo
-
-type Cordinate_and_time struct {
-	Lat       float64 `json:"Lat"`
-	Lng       float64 `json:"Lng"`
-	Timestamp int64  `gorm:"not null" form:"Timestamp"json:"Timestamp"`
-}
-
-type Geo struct{
-	Lat  float64 `gorm:"not null" form:"Lat" json:"Lat"`
-	Lng  float64 `gorm:"not null" form:"Lng"json:"Lng"`
-}
-
-
-
-var All_Cities = []CityInfo{
-	CityInfo{"bp", Geo{99,99}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  100},
-	CityInfo{"becs", Geo{97,97}, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1000},
-	CityInfo{"paris", Geo{98,98}, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1000},
-	CityInfo{"becs", Geo{96,96}, [5]float64{1120, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 1000},
-	CityInfo{"becs", Geo{96,96}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 1000},
-	CityInfo{"london", Geo{95,95}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
-
-}
-
-func main() {
-	r := gin.Default()
-	v1 := r.Group("/")
-	{
-		// list all cities
-		v1.GET("/cities", GetCities)
-		// find specific city by name
-		v1.GET("/city/:name", GetCityName)
-		// make forecast for exact place
-		v1.GET("/avg", GetCordinate)
-
-		//Todo not works yet (save new city)
-		v1.POST("/push", PostCity)
-	}
-
-	r.Run(":8080")
-}
-
 func GetCities(c *gin.Context) {
-
-	c.JSON(200, All_Cities)
-
+	c.JSON(200, mock_data.All_Cities)
 }
 
 func GetCityName(c *gin.Context) {
@@ -76,20 +23,19 @@ func GetCityName(c *gin.Context) {
 	var filtered_cities_by_time CitiesInfo
 
 	var redflag bool = true
-	for _, v := range All_Cities {
+	for _, v := range mock_data.All_Cities {
 		if v.City == name {
 			redflag = false
-			filtered_cities_by_time= append(filtered_cities_by_time, v)
+			filtered_cities_by_time = append(filtered_cities_by_time, v)
 		}
 	}
 	sort.Sort(filtered_cities_by_time)
-
 	if redflag {
 		content := gin.H{"error": "city with name " + name + " not found"}
 		c.JSON(404, content)
-	}else{
+	} else {
 
-		c.JSON(200, gin.H{"filtered cities by time":  filtered_cities_by_time } )
+		c.JSON(200, gin.H{"filtered cities by time": filtered_cities_by_time})
 	}
 }
 
@@ -101,7 +47,7 @@ func GetCordinate(c *gin.Context) {
 	timestamp := c.Query("timestamp")
 	//Convert to float64/int
 
-	if lat == "" || lng =="" || timestamp == ""{
+	if lat == "" || lng == "" || timestamp == "" {
 		content := gin.H{"error": 23}
 		c.JSON(400, content)
 	}
@@ -111,11 +57,10 @@ func GetCordinate(c *gin.Context) {
 	timestamp_int, _ := strconv.ParseInt(timestamp, 10, 64)
 	//put data to struct
 
-	//todo filter cities
 	// filter for the nearest data (by timestamp)
-	var filtered_cities = nearest_city_data(All_Cities, timestamp_int)
+	var filtered_cities = nearest_city_data(mock_data.All_Cities, timestamp_int)
 
-	var present_data = Cordinate_and_time{lat_float64, lng_float64,timestamp_int }
+	var present_data = city_structs.Cordinate_and_time{lat_float64, lng_float64, timestamp_int}
 
 	// count all distances
 	var distances []float64 = check_distance(present_data, filtered_cities)
@@ -136,10 +81,9 @@ func GetCordinate(c *gin.Context) {
 	c.JSON(200, content)
 }
 
-func check_distance(cordinate Cordinate_and_time, info []CityInfo) []float64 {
+func check_distance(cordinate city_structs.Cordinate_and_time, info []city_structs.CityInfo) []float64 {
 	// container for distance
 	var distances []float64
-
 
 	for _, info := range info {
 		//pitágoras
@@ -198,9 +142,8 @@ func balanced_distance(distances []float64) []float64 {
 	return balance_by_distance
 }
 
-
 // todo refactor calculate_temps and calulate_rain to one function
-func calculate_temps(balance []float64, info []CityInfo) []float64 {
+func calculate_temps(balance []float64, info []city_structs.CityInfo) []float64 {
 
 	var forecast_celsius []float64
 	var total_balance float64
@@ -219,7 +162,7 @@ func calculate_temps(balance []float64, info []CityInfo) []float64 {
 	return forecast_celsius
 }
 
-func calculate_rain(balance []float64, info []CityInfo) []float64 {
+func calculate_rain(balance []float64, info []city_structs.CityInfo) []float64 {
 
 	var forecast_rain []float64
 	var total_balance float64
@@ -242,51 +185,47 @@ func calculate_rain(balance []float64, info []CityInfo) []float64 {
 
 func PostCity(c *gin.Context) {
 
-
-	var json CityInfo
+	var json city_structs.CityInfo
 	c.Bind(&json) // This will infer what binder to use depending on the content-type header.
 
-	for _,v:= range json.Rain{
+	for _, v := range json.Rain {
 
-		if v < 0 || v > 1{
+		if v < 0 || v > 1 {
 			c.JSON(400, gin.H{
 				"result": "Failed, invalid temp data (should be beetween 0 and 1)",
 			})
 		}
 	}
-		All_Cities = append(All_Cities,json)
-		content := gin.H{
-			"result": "Success",
-			"title": json,
-		}
-		c.JSON(201, content)
-
+	mock_data.All_Cities = append(mock_data.All_Cities, json)
+	content := gin.H{
+		"result": "Success",
+		"title":  json,
+	}
+	c.JSON(201, content)
 
 }
 
-func nearest_city_data(all_cities []CityInfo, timestamp int64) ([]CityInfo) {
+func nearest_city_data(all_cities []city_structs.CityInfo, timestamp int64) []city_structs.CityInfo {
 
 	var order_by_time_cites CitiesInfo
-	var filtered_cities CitiesInfo
+	var filtered_cities city_structs.CitiesInfo
 
+	for _, v := range all_cities {
+		order_by_time_cites = append(order_by_time_cites, v)
+	}
 
-
-	for _,v := range all_cities{
-		order_by_time_cites= append(order_by_time_cites, v)
-			}
-
-	for i,_:= range order_by_time_cites{
+	for i, _ := range order_by_time_cites {
 
 		order_by_time_cites[i].Timestamp -= timestamp
-		if order_by_time_cites[i].Timestamp < 0{
+		if order_by_time_cites[i].Timestamp < 0 {
 			order_by_time_cites[i].Timestamp *= -1
 		}
 	}
 
 	sort.Sort(order_by_time_cites)
 
-	for _,v := range order_by_time_cites{
-		if contains(filtered_cities, v) == false{
+	for _, v := range order_by_time_cites {
+		if contains(filtered_cities, v) == false {
 			filtered_cities = append(filtered_cities, v)
 		}
 	}
@@ -294,11 +233,7 @@ func nearest_city_data(all_cities []CityInfo, timestamp int64) ([]CityInfo) {
 	return filtered_cities
 }
 
-
-
-
-
-// order Cities by Timestamp
+//// order Cities by Timestamp
 func (slice CitiesInfo) Len() int {
 	return len(slice)
 }
@@ -311,7 +246,7 @@ func (slice CitiesInfo) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-func contains(intSlice CitiesInfo, searchInt CityInfo) bool {
+func contains(intSlice city_structs.CitiesInfo, searchInt city_structs.CityInfo) bool {
 	for _, value := range intSlice {
 		if value.City == searchInt.City {
 			return true
@@ -319,3 +254,6 @@ func contains(intSlice CitiesInfo, searchInt CityInfo) bool {
 	}
 	return false
 }
+
+type CitiesInfo []city_structs.CityInfo
+
