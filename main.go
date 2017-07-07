@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
 	"sort"
 	"fmt"
+
 )
 
 //TODO put lat and lng to Geo
@@ -231,16 +231,24 @@ func calculate_rain(balance []float64, info []CityInfo) []float64 {
 
 func PostCity(c *gin.Context) {
 
-	var new_city CityInfo
-	t := time.Now().Unix()
-	new_city = CityInfo{"koln", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, t}
-	All_Cities = append(All_Cities,new_city)
 
+	var json CityInfo
+	c.Bind(&json) // This will infer what binder to use depending on the content-type header.
 
+	for _,v:= range json.Rain{
 
-	content := gin.H{"new data saver successfully":new_city}
-	// send data
-	c.JSON(200, content)
+		if v < 0 || v > 1{
+			c.JSON(400, gin.H{
+				"result": "Failed, invalid temp data (should be beetween 0 and 1)",
+			})
+		}
+	}
+		content := gin.H{
+			"result": "Success",
+			"title": json,
+		}
+		c.JSON(201, content)
+
 
 }
 
