@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"sort"
 )
 
 //TODO put lat and lng to Geo
@@ -15,11 +16,12 @@ type CityInfo struct {
 	City string  `gorm:"not null" form:"City" json:"City"`
 	Lat  float64 `gorm:"not null" form:"Lat" json:"Lat"`
 	Lng  float64 `gorm:"not null" form:"Lng"json:"Lng"`
-	//Cordinate []float64
 	Temp      [5]float64 `gorm:"not null" form:"Temp"json:"Temp"`
 	Rain      [5]float64 `gorm:"not null" form:"Rain"json:"Rain"`
 	Timestamp int64    `gorm:"not null" form:"Timestamp"json:"Timestamp"`
 }
+
+type CitiesInfo []CityInfo
 
 type Cordinate_and_time struct {
 	Lat       float64 `json:"Lat"`
@@ -30,9 +32,9 @@ type Cordinate_and_time struct {
 
 
 var All_Cities = []CityInfo{
-	CityInfo{"bp", 99, 99, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  time.Now().Unix()},
-	CityInfo{"becs", 98, 98, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
-	CityInfo{"becs", 97, 97, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
+	CityInfo{"bp", 99, 99, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  1499418245},
+	CityInfo{"becs", 98, 98, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 2499418245},
+	CityInfo{"becs", 97, 97, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1899418245},
 	CityInfo{"becs", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
 }
 
@@ -63,18 +65,23 @@ func GetCities(c *gin.Context) {
 func GetCityName(c *gin.Context) {
 	name := c.Params.ByName("name")
 
+	var filtered_cities_by_time CitiesInfo
+
 	var redflag bool = true
 	for _, v := range All_Cities {
 		if v.City == name {
 			redflag = false
-			content := gin.H{"celsius next 5 days": v.Temp, "rainning chance next 5 days": v.Rain}
-			c.JSON(200, content)
+			filtered_cities_by_time= append(filtered_cities_by_time, v)
+			sort.Sort(filtered_cities_by_time)
 		}
 	}
 
 	if redflag {
 		content := gin.H{"error": "city with name " + name + " not found"}
 		c.JSON(404, content)
+	}else{
+
+		c.JSON(200, gin.H{"filtered cities by time":  filtered_cities_by_time } )
 	}
 }
 
@@ -225,4 +232,18 @@ func PostCity(c *gin.Context) {
 	// send data
 	c.JSON(200, content)
 
+}
+
+
+// filter Cities by Timestamp
+func (slice CitiesInfo) Len() int {
+	return len(slice)
+}
+
+func (slice CitiesInfo) Less(i, j int) bool {
+	return slice[i].Timestamp < slice[j].Timestamp;
+}
+
+func (slice CitiesInfo) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
 }
