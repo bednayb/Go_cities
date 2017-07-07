@@ -37,11 +37,11 @@ type Geo struct{
 
 
 var All_Cities = []CityInfo{
-	CityInfo{"bp", Geo{99,99}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  1499418245},
-	CityInfo{"becs", Geo{97,97}, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 2499418245},
-	CityInfo{"paris", Geo{98,98}, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1899418245},
-	CityInfo{"becs", Geo{96,96}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 3499418245},
-	CityInfo{"becs", Geo{96,96}, [5]float64{120, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 2499418245},
+	CityInfo{"bp", Geo{99,99}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  100},
+	CityInfo{"becs", Geo{97,97}, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1000},
+	CityInfo{"paris", Geo{98,98}, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1000},
+	CityInfo{"becs", Geo{96,96}, [5]float64{1120, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 1000},
+	CityInfo{"becs", Geo{96,96}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 1000},
 	CityInfo{"london", Geo{95,95}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
 
 }
@@ -102,8 +102,8 @@ func GetCordinate(c *gin.Context) {
 	//Convert to float64/int
 
 	if lat == "" || lng =="" || timestamp == ""{
-		content := gin.H{"error": "invalid data"}
-		c.JSON(404, content)
+		content := gin.H{"error": 23}
+		c.JSON(400, content)
 	}
 
 	lat_float64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
@@ -112,8 +112,8 @@ func GetCordinate(c *gin.Context) {
 	//put data to struct
 
 	//todo filter cities
-	// filter for the latest data (by timestamp)
-	var filtered_cities = lastest_city_data(All_Cities)
+	// filter for the nearest data (by timestamp)
+	var filtered_cities = nearest_city_data(All_Cities, timestamp_int)
 
 	var present_data = Cordinate_and_time{lat_float64, lng_float64,timestamp_int }
 
@@ -264,25 +264,32 @@ func PostCity(c *gin.Context) {
 
 }
 
-func lastest_city_data(all_cities []CityInfo) ([]CityInfo) {
+func nearest_city_data(all_cities []CityInfo, timestamp int64) ([]CityInfo) {
 
 	var order_by_time_cites CitiesInfo
 	var filtered_cities CitiesInfo
+
+
 
 	for _,v := range all_cities{
 		order_by_time_cites= append(order_by_time_cites, v)
 			}
 
-	sort.Sort(sort.Reverse(order_by_time_cites))
+	for i,_:= range order_by_time_cites{
 
+		order_by_time_cites[i].Timestamp -= timestamp
+		if order_by_time_cites[i].Timestamp < 0{
+			order_by_time_cites[i].Timestamp *= -1
+		}
+	}
+
+	sort.Sort(order_by_time_cites)
 
 	for _,v := range order_by_time_cites{
 		if contains(filtered_cities, v) == false{
 			filtered_cities = append(filtered_cities, v)
 		}
 	}
-
-
 
 	return filtered_cities
 }
