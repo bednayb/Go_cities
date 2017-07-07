@@ -10,6 +10,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sort"
 )
 
 func GetCities(c *gin.Context) {
@@ -19,7 +20,7 @@ func GetCities(c *gin.Context) {
 func GetCityName(c *gin.Context) {
 	name := c.Params.ByName("name")
 
-	var filtered_cities_by_time city_structs.CitiesInfo
+	var filtered_cities_by_time CitiesInfo
 
 	var redflag bool = true
 	for _, v := range mock_data.All_Cities {
@@ -28,7 +29,7 @@ func GetCityName(c *gin.Context) {
 			filtered_cities_by_time = append(filtered_cities_by_time, v)
 		}
 	}
-	//sort.Sort(filtered_cities_by_time)
+	sort.Sort(filtered_cities_by_time)
 	if redflag {
 		content := gin.H{"error": "city with name " + name + " not found"}
 		c.JSON(404, content)
@@ -206,7 +207,7 @@ func PostCity(c *gin.Context) {
 
 func nearest_city_data(all_cities []city_structs.CityInfo, timestamp int64) []city_structs.CityInfo {
 
-	var order_by_time_cites city_structs.CitiesInfo
+	var order_by_time_cites CitiesInfo
 	var filtered_cities city_structs.CitiesInfo
 
 	for _, v := range all_cities {
@@ -221,7 +222,7 @@ func nearest_city_data(all_cities []city_structs.CityInfo, timestamp int64) []ci
 		}
 	}
 
-	//sort.Sort(order_by_time_cites)
+	sort.Sort(order_by_time_cites)
 
 	for _, v := range order_by_time_cites {
 		if contains(filtered_cities, v) == false {
@@ -232,19 +233,19 @@ func nearest_city_data(all_cities []city_structs.CityInfo, timestamp int64) []ci
 	return filtered_cities
 }
 
-////// order Cities by Timestamp
-//func (slice CitiesInfo) Len() int {
-//	return len(slice)
-//}
-//
-//func (slice CitiesInfo) Less(i, j int) bool {
-//	return slice[i].CityInfo.Timestamp < slice[j].CityInfo.Timestamp;
-//}
-//
-//func (slice CitiesInfo) Swap(i, j int) {
-//	slice[i], slice[j] = slice[j], slice[i]
-//}
-//
+//// order Cities by Timestamp
+func (slice CitiesInfo) Len() int {
+	return len(slice)
+}
+
+func (slice CitiesInfo) Less(i, j int) bool {
+	return slice[i].Timestamp < slice[j].Timestamp;
+}
+
+func (slice CitiesInfo) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
 func contains(intSlice city_structs.CitiesInfo, searchInt city_structs.CityInfo) bool {
 	for _, value := range intSlice {
 		if value.City == searchInt.City {
@@ -254,11 +255,5 @@ func contains(intSlice city_structs.CitiesInfo, searchInt city_structs.CityInfo)
 	return false
 }
 
-//
-//type CityInfo struct{
-//	CityInfo city_structs.CityInfo
-//}
-//
-//type CitiesInfo []CityInfo
-//
-//
+type CitiesInfo []city_structs.CityInfo
+
