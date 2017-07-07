@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 )
 
@@ -17,20 +18,22 @@ type CityInfo struct {
 	//Cordinate []float64
 	Temp      [5]float64 `gorm:"not null" form:"Temp"json:"Temp"`
 	Rain      [5]float64 `gorm:"not null" form:"Rain"json:"Rain"`
-	Timestamp float64    `gorm:"not null" form:"Timestamp"json:"Timestamp"`
+	Timestamp int64    `gorm:"not null" form:"Timestamp"json:"Timestamp"`
 }
 
 type Cordinate_and_time struct {
 	Lat       float64 `json:"Lat"`
 	Lng       float64 `json:"Lng"`
-	Timestamp int64   `gorm:"not null" form:"Timestamp"json:"Timestamp"`
+	Timestamp int64  `gorm:"not null" form:"Timestamp"json:"Timestamp"`
 }
 
+
+
 var All_Cities = []CityInfo{
-	CityInfo{"bp", 99, 99, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 43},
-	CityInfo{"becs", 98, 98, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 43},
-	CityInfo{"becs", 97, 97, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 43},
-	CityInfo{"becs", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 43},
+	CityInfo{"bp", 99, 99, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  time.Now().Unix()},
+	CityInfo{"becs", 98, 98, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
+	CityInfo{"becs", 97, 97, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
+	CityInfo{"becs", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
 }
 
 func main() {
@@ -86,7 +89,8 @@ func GetCordinate(c *gin.Context) {
 	lng_float64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
 	timestamp_int, _ := strconv.ParseInt(timestamp, 10, 64)
 	//put data to struct
-	var present_data = Cordinate_and_time{lat_float64, lng_float64, timestamp_int}
+	// todo change timestamp
+	var present_data = Cordinate_and_time{lat_float64, lng_float64,timestamp_int }
 
 	// count all distances
 	var distances []float64 = check_distance(present_data, All_Cities)
@@ -211,8 +215,14 @@ func calculate_rain(balance []float64, info []CityInfo) []float64 {
 func PostCity(c *gin.Context) {
 
 	var new_city CityInfo
-	new_city = CityInfo{"koln", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 43}
+	t := time.Now().Unix()
+	new_city = CityInfo{"koln", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, t}
 	All_Cities = append(All_Cities,new_city)
 
+
+
+	content := gin.H{"new data saver successfully":new_city}
+	// send data
+	c.JSON(200, content)
 
 }
