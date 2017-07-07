@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"sort"
+	"fmt"
 )
 
 //TODO put lat and lng to Geo
@@ -32,10 +33,12 @@ type Cordinate_and_time struct {
 
 
 var All_Cities = []CityInfo{
-	CityInfo{"bp", 99, 99, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  1499418245},
+	CityInfo{"bp", 99, 99, [5]float64{120, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  1499418245},
 	CityInfo{"becs", 98, 98, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 2499418245},
-	CityInfo{"becs", 97, 97, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1899418245},
-	CityInfo{"becs", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
+	CityInfo{"paris", 97, 97, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1899418245},
+	CityInfo{"becs", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 3499418245},
+	CityInfo{"london", 95, 95, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
+
 }
 
 func main() {
@@ -72,9 +75,9 @@ func GetCityName(c *gin.Context) {
 		if v.City == name {
 			redflag = false
 			filtered_cities_by_time= append(filtered_cities_by_time, v)
-			sort.Sort(filtered_cities_by_time)
 		}
 	}
+	sort.Sort(filtered_cities_by_time)
 
 	if redflag {
 		content := gin.H{"error": "city with name " + name + " not found"}
@@ -98,22 +101,26 @@ func GetCordinate(c *gin.Context) {
 	//put data to struct
 
 	//todo filter cities
-
+	// filter for the latest data (by timestamp)
+	var filtered_cities = lastest_city_data(All_Cities)
 
 	var present_data = Cordinate_and_time{lat_float64, lng_float64,timestamp_int }
 
 	// count all distances
-	var distances []float64 = check_distance(present_data, All_Cities)
+	var distances []float64 = check_distance(present_data, filtered_cities)
 
 	// balanced the distances
 	var balance []float64 = balanced_distance(distances)
 
 	// count the forecast data todo refactor to one function
-	var forecast_celsius []float64 = calculate_temps(balance, All_Cities)
-	var forecast_rain []float64 = calculate_rain(balance, All_Cities)
+	var forecast_celsius []float64 = calculate_temps(balance, filtered_cities)
+	var forecast_rain []float64 = calculate_rain(balance, filtered_cities)
 
+	// todo delete them
+	fmt.Println(forecast_rain, forecast_celsius)
 	// add description
 	content := gin.H{"expected celsius next 5 days": forecast_celsius, "expected rainning chance next 5 days": forecast_rain}
+	//content:= filtered_cities
 	// send data
 	c.JSON(200, content)
 }
@@ -237,6 +244,32 @@ func PostCity(c *gin.Context) {
 
 }
 
+func lastest_city_data(all_cities []CityInfo) ([]CityInfo) {
+
+	var order_by_time_cites CitiesInfo
+	var filtered_cities CitiesInfo
+
+	for _,v := range all_cities{
+		order_by_time_cites= append(order_by_time_cites, v)
+			}
+
+	sort.Sort(sort.Reverse(order_by_time_cites))
+
+
+	for _,v := range order_by_time_cites{
+		if contains(filtered_cities, v) == false{
+			filtered_cities = append(filtered_cities, v)
+		}
+	}
+
+
+
+	return filtered_cities
+}
+
+
+
+
 
 // order Cities by Timestamp
 func (slice CitiesInfo) Len() int {
@@ -249,4 +282,13 @@ func (slice CitiesInfo) Less(i, j int) bool {
 
 func (slice CitiesInfo) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
+}
+
+func contains(intSlice CitiesInfo, searchInt CityInfo) bool {
+	for _, value := range intSlice {
+		if value.City == searchInt.City {
+			return true
+		}
+	}
+	return false
 }
