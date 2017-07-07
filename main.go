@@ -15,8 +15,7 @@ import (
 //TODO put lat and lng to Geo
 type CityInfo struct {
 	City string  `gorm:"not null" form:"City" json:"City"`
-	Lat  float64 `gorm:"not null" form:"Lat" json:"Lat"`
-	Lng  float64 `gorm:"not null" form:"Lng"json:"Lng"`
+	Geo Geo
 	Temp      [5]float64 `gorm:"not null" form:"Temp"json:"Temp"`
 	Rain      [5]float64 `gorm:"not null" form:"Rain"json:"Rain"`
 	Timestamp int64    `gorm:"not null" form:"Timestamp"json:"Timestamp"`
@@ -30,14 +29,19 @@ type Cordinate_and_time struct {
 	Timestamp int64  `gorm:"not null" form:"Timestamp"json:"Timestamp"`
 }
 
+type Geo struct{
+	Lat  float64 `gorm:"not null" form:"Lat" json:"Lat"`
+	Lng  float64 `gorm:"not null" form:"Lng"json:"Lng"`
+}
+
 
 
 var All_Cities = []CityInfo{
-	CityInfo{"bp", 99, 99, [5]float64{120, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  1499418245},
-	CityInfo{"becs", 98, 98, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 2499418245},
-	CityInfo{"paris", 97, 97, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1899418245},
-	CityInfo{"becs", 96, 96, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 3499418245},
-	CityInfo{"london", 95, 95, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
+	CityInfo{"bp", Geo{99,99}, [5]float64{120, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  1499418245},
+	CityInfo{"becs", Geo{97,97}, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 2499418245},
+	CityInfo{"paris", Geo{98,98}, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1899418245},
+	CityInfo{"becs", Geo{96,96}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 3499418245},
+	CityInfo{"london", Geo{95,95}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
 
 }
 
@@ -132,8 +136,8 @@ func check_distance(cordinate Cordinate_and_time, info []CityInfo) []float64 {
 
 	for _, info := range info {
 		//pitágoras
-		dis_lat := cordinate.Lat - info.Lat
-		dis_lng := cordinate.Lng - info.Lng
+		dis_lat := cordinate.Lat - info.Geo.Lat
+		dis_lng := cordinate.Lng - info.Geo.Lng
 
 		var distance float64
 		distance = math.Sqrt(math.Pow(dis_lat, 2) + math.Pow(dis_lng, 2))
@@ -243,6 +247,7 @@ func PostCity(c *gin.Context) {
 			})
 		}
 	}
+		All_Cities = append(All_Cities,json)
 		content := gin.H{
 			"result": "Success",
 			"title": json,
