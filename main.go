@@ -37,10 +37,11 @@ type Geo struct{
 
 
 var All_Cities = []CityInfo{
-	CityInfo{"bp", Geo{99,99}, [5]float64{120, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  1499418245},
+	CityInfo{"bp", Geo{99,99}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6},  1499418245},
 	CityInfo{"becs", Geo{97,97}, [5]float64{20, 4, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 2499418245},
 	CityInfo{"paris", Geo{98,98}, [5]float64{20, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1899418245},
 	CityInfo{"becs", Geo{96,96}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 3499418245},
+	CityInfo{"becs", Geo{96,96}, [5]float64{120, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 2499418245},
 	CityInfo{"london", Geo{95,95}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, time.Now().Unix()},
 
 }
@@ -99,6 +100,12 @@ func GetCordinate(c *gin.Context) {
 	lng := c.Query("lng")
 	timestamp := c.Query("timestamp")
 	//Convert to float64/int
+
+	if lat == "" || lng =="" || timestamp == ""{
+		content := gin.H{"error": "invalid data"}
+		c.JSON(404, content)
+	}
+
 	lat_float64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
 	lng_float64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
 	timestamp_int, _ := strconv.ParseInt(timestamp, 10, 64)
