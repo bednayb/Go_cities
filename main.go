@@ -96,7 +96,10 @@ func GetCordinate(c *gin.Context) {
 	lng_float64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
 	timestamp_int, _ := strconv.ParseInt(timestamp, 10, 64)
 	//put data to struct
-	// todo change timestamp
+
+	//todo filter cities
+
+
 	var present_data = Cordinate_and_time{lat_float64, lng_float64,timestamp_int }
 
 	// count all distances
@@ -235,7 +238,7 @@ func PostCity(c *gin.Context) {
 }
 
 
-// filter Cities by Timestamp
+// order Cities by Timestamp
 func (slice CitiesInfo) Len() int {
 	return len(slice)
 }
