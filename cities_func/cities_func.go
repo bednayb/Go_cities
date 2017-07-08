@@ -198,8 +198,8 @@ func PostCity(c *gin.Context) {
 	}
 	mock_data.All_Cities = append(mock_data.All_Cities, json)
 	content := gin.H{
-		"result": "Success",
-		"title":  json,
+		"result": "successful saving",
+		//"title":  json,
 	}
 	c.JSON(201, content)
 
