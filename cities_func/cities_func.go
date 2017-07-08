@@ -58,19 +58,19 @@ func GetCordinate(c *gin.Context) {
 	//put data to struct
 
 	// filter for the nearest data (by timestamp)
-	var filtered_cities = nearest_city_data(mock_data.All_Cities, timestamp_int)
+	var filtered_cities = Nearest_city_data(mock_data.All_Cities, timestamp_int)
 
 	var present_data = city_structs.Cordinate_and_time{lat_float64, lng_float64, timestamp_int}
 
 	// count all distances
-	var distances []float64 = check_distance(present_data, filtered_cities)
+	var distances []float64 = Check_distance(present_data, filtered_cities)
 
 	// balanced the distances
-	var balance []float64 = balanced_distance(distances)
+	var balance []float64 = Balanced_distance(distances)
 
 	// count the forecast data todo refactor to one function
-	var forecast_celsius []float64 = calculate_temps(balance, filtered_cities)
-	var forecast_rain []float64 = calculate_rain(balance, filtered_cities)
+	var forecast_celsius []float64 = Calculate_temps(balance, filtered_cities)
+	var forecast_rain []float64 = Calculate_rain(balance, filtered_cities)
 
 	// todo delete them
 	fmt.Println(forecast_rain, forecast_celsius)
@@ -81,7 +81,7 @@ func GetCordinate(c *gin.Context) {
 	c.JSON(200, content)
 }
 
-func check_distance(cordinate city_structs.Cordinate_and_time, info []city_structs.CityInfo) []float64 {
+func Check_distance(cordinate city_structs.Cordinate_and_time, info []city_structs.CityInfo) []float64 {
 	// container for distance
 	var distances []float64
 
@@ -98,7 +98,7 @@ func check_distance(cordinate city_structs.Cordinate_and_time, info []city_struc
 	return distances
 }
 
-func balanced_distance(distances []float64) []float64 {
+func Balanced_distance(distances []float64) []float64 {
 
 	// container for balanced distance (return value)
 	var balance_by_distance []float64
@@ -143,7 +143,7 @@ func balanced_distance(distances []float64) []float64 {
 }
 
 // todo refactor calculate_temps and calulate_rain to one function
-func calculate_temps(balance []float64, info []city_structs.CityInfo) []float64 {
+func Calculate_temps(balance []float64, info []city_structs.CityInfo) []float64 {
 
 	var forecast_celsius []float64
 	var total_balance float64
@@ -162,7 +162,7 @@ func calculate_temps(balance []float64, info []city_structs.CityInfo) []float64 
 	return forecast_celsius
 }
 
-func calculate_rain(balance []float64, info []city_structs.CityInfo) []float64 {
+func Calculate_rain(balance []float64, info []city_structs.CityInfo) []float64 {
 
 	var forecast_rain []float64
 	var total_balance float64
@@ -205,7 +205,7 @@ func PostCity(c *gin.Context) {
 
 }
 
-func nearest_city_data(all_cities []city_structs.CityInfo, timestamp int64) []city_structs.CityInfo {
+func Nearest_city_data(all_cities []city_structs.CityInfo, timestamp int64) []city_structs.CityInfo {
 
 	var order_by_time_cites CitiesInfo
 	var filtered_cities city_structs.CitiesInfo
