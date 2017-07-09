@@ -157,7 +157,12 @@ func Calculate_temps(balance []float64, info []city_structs.CityInfo) []float64 
 			total_balance += balance[i]
 			total_temp += v.Temp[c] * balance[i]
 		}
-		forecast_celsius = append(forecast_celsius, total_temp/total_balance)
+
+		// cut off 2 decimal
+		var untruncated float64 = total_temp/total_balance
+		truncated := float64(int(untruncated * 100)) / 100
+
+		forecast_celsius = append(forecast_celsius, truncated)
 	}
 	return forecast_celsius
 }
@@ -178,7 +183,11 @@ func Calculate_rain(balance []float64, info []city_structs.CityInfo) []float64 {
 			total_balance += balance[i]
 			total_temp += v.Rain[c] * balance[i]
 		}
-		forecast_rain = append(forecast_rain, total_temp/total_balance)
+		// cut off 2 decimal
+		var untruncated float64 = total_temp/total_balance
+		truncated := float64(int(untruncated * 100)) / 100
+
+		forecast_rain = append(forecast_rain, truncated)
 	}
 	return forecast_rain
 }
