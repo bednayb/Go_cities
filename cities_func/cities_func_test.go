@@ -93,6 +93,44 @@ func TestBalanced_distance(t *testing.T) {
 
 }
 
+func TestCalculate_temps(t *testing.T) {
+
+	balance := []float64{0, 0.5, 1}
+
+	mockCities := []city_structs.CityInfo{
+		city_structs.CityInfo{"becs", city_structs.Geo{97, 96}, [5]float64{100, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 100},
+		city_structs.CityInfo{"paris", city_structs.Geo{80, 79}, [5]float64{40, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 1500},
+		city_structs.CityInfo{"bp", city_structs.Geo{94, 92}, [5]float64{10, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 1100},
+	}
+
+	resultTemps := Calculate_temps(balance,mockCities)
+	expected_result := []float64{20,3,17,5,6}
+
+	if false == CompareSlices_General(resultTemps, expected_result) {
+		t.Fatal("doesnt equal result:", resultTemps, "expected_value:", expected_result)
+	}
+}
+
+func TestCalculate_rains(t *testing.T) {
+
+	balance := []float64{0, 0.5, 1}
+
+	mockCities := []city_structs.CityInfo{
+		city_structs.CityInfo{"becs", city_structs.Geo{97, 96}, [5]float64{100, 3, 17, 5, 6}, [5]float64{1, 0.6, 0.4, 0.5, 0.6}, 100},
+		city_structs.CityInfo{"paris", city_structs.Geo{80, 79}, [5]float64{40, 3, 17, 5, 6}, [5]float64{0.4, 0.6, 0.4, 0.5, 0.6}, 1500},
+		city_structs.CityInfo{"bp", city_structs.Geo{94, 92}, [5]float64{10, 3, 17, 5, 6}, [5]float64{0.1, 0.6, 0.4, 0.5, 0.6}, 1100},
+	}
+
+	resultRain := Calculate_rain(balance,mockCities)
+	expected_result := []float64{.2,.6,0.4,0.5,0.6}
+
+	if false == CompareSlices_General(resultRain, expected_result) {
+		t.Fatal("doesnt equal result:", resultRain, "expected_value:", expected_result)
+	}
+}
+
+
+
 // helper functions
 func CompareSlices_General(a, b []float64) bool {
 	if len(a) != len(b) {
