@@ -58,7 +58,7 @@ func GetCordinate(c *gin.Context) {
 	//put data to struct
 
 	// filter for the nearest data (by timestamp)
-	var filtered_cities = Nearest_city_data(mock_data.All_Cities, timestamp_int)
+	var filtered_cities = Nearest_city_data_in_time(mock_data.All_Cities, timestamp_int)
 
 	var present_data = city_structs.Cordinate_and_time{lat_float64, lng_float64, timestamp_int}
 
@@ -205,7 +205,7 @@ func PostCity(c *gin.Context) {
 
 }
 
-func Nearest_city_data(all_cities []city_structs.CityInfo, timestamp int64) []city_structs.CityInfo {
+func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int64) []city_structs.CityInfo {
 
 	var order_by_time_cites CitiesInfo
 	var filtered_cities city_structs.CitiesInfo
@@ -224,9 +224,11 @@ func Nearest_city_data(all_cities []city_structs.CityInfo, timestamp int64) []ci
 
 	sort.Sort(order_by_time_cites)
 
-	for _, v := range order_by_time_cites {
+	for i, v := range order_by_time_cites {
+
 		if contains(filtered_cities, v) == false {
-			filtered_cities = append(filtered_cities, v)
+			order_by_time_cites[i].Timestamp += timestamp
+			filtered_cities = append(filtered_cities, order_by_time_cites[i])
 		}
 	}
 
