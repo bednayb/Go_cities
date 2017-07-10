@@ -12,7 +12,9 @@ import (
 	"strings"
 	"sort"
 )
-
+// TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük!
+// TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük
+// TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor
 func GetCities(c *gin.Context) {
 	c.JSON(200, mock_data.All_Cities)
 }
@@ -34,11 +36,12 @@ func GetCityName(c *gin.Context) {
 		content := gin.H{"error": "city with name " + name + " not found"}
 		c.JSON(404, content)
 	} else {
-
 		c.JSON(200, gin.H{"filtered cities by time": filtered_cities_by_time})
 	}
+	// TODO érdemes lenne mindkét if ágban egy return, hogy ide ne juthassunk el.
+	// Ha itt bármilyen kód lenne független attól hogy not found volt e lefutna!
 }
-
+// TODO ennek a fügvénynek a neve nem tükrözi hogy valójában mit csinál
 func GetCordinate(c *gin.Context) {
 
 	// save data from URL
@@ -47,15 +50,22 @@ func GetCordinate(c *gin.Context) {
 	timestamp := c.Query("timestamp")
 	//Convert to float64/int
 
+	// TODO Hiba ellenőrzéskor értelmes hibaüzenetet szeretnénk adni pontosan arról ami a hibát okozta
+
 	if lat == "" || lng == "" || timestamp == "" {
 		content := gin.H{"error": 23}
 		c.JSON(400, content)
+		// TODO itt érdemes lenne egy return, hogy ne folytassuk a futást ha hiba volt
 	}
 
 	lat_float64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
 	lng_float64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
 	timestamp_int, _ := strconv.ParseInt(timestamp, 10, 64)
 	//put data to struct
+	// TODO a fenti parsolások mindegyikénél előfordulhat hiba, amit így teljesen figyelmen kívűl hagyunk
+	// TODO a fentabbi ellenőrzési szisztémával adhatunk hibaüzenetet hogy melyikből nem sikerült számot kinyernünk.
+	// + Ellenőrizhető hogy a szám valós tartományban van e.
+	// hiba esetén itt se menjünk tovább.
 
 	// filter for the nearest data (by timestamp)
 	var filtered_cities = Nearest_city_data_in_time(mock_data.All_Cities, timestamp_int)
@@ -213,11 +223,13 @@ func PostCity(c *gin.Context) {
 	c.JSON(201, content)
 
 }
-
+// TODO használjunk visszatérési érték változónevet is.
 func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int64) []city_structs.CityInfo {
+	// TODO én MAP ez használnék ahol a város neve a kulcs
+	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
 
 	var order_by_time_cites CitiesInfo
-	var filtered_cities city_structs.CitiesInfo
+	var filtered_cities city_structs.CitiesInfo // TODO
 
 	for _, v := range all_cities {
 		order_by_time_cites = append(order_by_time_cites, v)
@@ -243,6 +255,9 @@ func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int
 
 	return filtered_cities
 }
+
+// TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy
+// egyben látszódjon egy egy adattípusról, hogy mik az elemei és mik a rá definiált fugvények
 
 //// order Cities by Timestamp
 func (slice CitiesInfo) Len() int {

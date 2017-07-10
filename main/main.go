@@ -1,5 +1,5 @@
 package main
-
+// TODO a main go a főkönyvtárvban szokott lenni általában
 import (
 	"github.com/bednayb/Go_cities/cities_func"
 	"github.com/gin-gonic/gin"
