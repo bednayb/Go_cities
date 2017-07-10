@@ -118,52 +118,71 @@ func GetExpectedForecast(c *gin.Context) {
 	var present_data = city_structs.Cordinate_and_time{lat_float64, lng_float64, timestamp_int}
 
 	// count all distances
-	var distances []float64 = Check_distance(present_data, filtered_cities)
+	var distances map[string]float64 = Check_distance(present_data, filtered_cities)
 
 	// balanced the distances
-	var balance []float64 = Balanced_distance(distances)
+	var balance map[string]float64 = Balanced_distance(distances)
 
 	// count the forecast data todo refactor to one function
 	var forecast_celsius []float64 = Calculate_temps(balance, filtered_cities)
-	var forecast_rain []float64 = Calculate_rain(balance, filtered_cities)
+	//var forecast_rain []float64 = Calculate_rain(balance, filtered_cities)
 
 	// todo delete them
-	fmt.Println(forecast_rain, forecast_celsius)
+	//fmt.Println(forecast_rain, forecast_celsius)
 	// add description
-	content := gin.H{"expected celsius next 5 days": forecast_celsius, "expected rainning chance next 5 days": forecast_rain}
-	//content:= filtered_cities
+	//content := gin.H{"expected celsius next 5 days": forecast_celsius, "expected rainning chance next 5 days": forecast_rain}
+
+
 	// send data
-	c.JSON(200, content)
+	c.JSON(200, forecast_celsius)
 }
 
-func Check_distance(cordinate city_structs.Cordinate_and_time, info []city_structs.CityInfo) []float64 {
+func Check_distance(cordinate city_structs.Cordinate_and_time, info map[string]city_structs.CityInfo) ( city_distance map[string]float64) {
 	// container for distance
-	var distances []float64
+	//var distances []float64
+	var m = make(map[string]float64)
 
 	for _, info := range info {
 		//pitágoras
 		dis_lat := cordinate.Lat - info.Geo.Lat
 		dis_lng := cordinate.Lng - info.Geo.Lng
-
+		fmt.Println(dis_lat)
+		fmt.Println(dis_lng)
+		//
 		var distance float64
 		distance = math.Sqrt(math.Pow(dis_lat, 2) + math.Pow(dis_lng, 2))
-		distances = append(distances, distance)
+		//distances = append(distances, distance)
+		fmt.Println(distance)
+
+		m[info.City] = distance
+		fmt.Println(info)
+
 	}
 
-	return distances
+	return m
 }
 
-func Balanced_distance(distances []float64) []float64 {
+func Balanced_distance(distances map[string]float64) (balance_by_distance map[string]float64) {
 
 	// container for balanced distance (return value)
-	var balance_by_distance []float64
 	// append number to return value
 	var balance_number float64
 
 	// todo find them in one for cicle
-	// find smallest
-	var permanent_smallest float64 = distances[0]
-	var smallest float64 = distances[0]
+
+	//// find biggest
+	var permanent_biggest float64
+	var biggest float64 = 0
+
+	for _, v := range distances {
+		if v > permanent_biggest {
+			permanent_biggest = v
+			biggest = permanent_biggest
+		}
+	}
+	//find smallest
+	var permanent_smallest float64 = biggest
+	var smallest float64 = biggest
 
 	for _, v := range distances {
 		if v < permanent_smallest {
@@ -172,33 +191,26 @@ func Balanced_distance(distances []float64) []float64 {
 		}
 	}
 
-	// find biggest
-	var permanent_biggest float64
-	var biggest float64 = distances[0]
-
-	for _, v := range distances {
-		if v > permanent_biggest {
-			permanent_biggest = v
-			biggest = permanent_biggest
-		}
-	}
+	fmt.Println(biggest)
+	fmt.Println(smallest)
 
 	// calculate balance number
-	for _, v := range distances {
+	for i, v := range distances {
 		//rate
 		balance_number = (v - smallest) / (biggest - smallest)
 		// todo find good description for this :)
 		balance_number -= 1
 		balance_number *= -1
-		//add data to cointainer
-		balance_by_distance = append(balance_by_distance, balance_number)
+
+		distances[i] = balance_number
+
 	}
 
-	return balance_by_distance
+	return distances
 }
 
 // todo refactor calculate_temps and calulate_rain to one function
-func Calculate_temps(balance []float64, info []city_structs.CityInfo) []float64 {
+func Calculate_temps(balance map[string]float64, info map[string]city_structs.CityInfo) ( forecast_temp []float64){
 
 	var forecast_celsius []float64
 	var total_balance float64
@@ -208,19 +220,25 @@ func Calculate_temps(balance []float64, info []city_structs.CityInfo) []float64 
 	for c := 0; c < 5; c++ {
 		total_balance = 0
 		total_temp = 0
-		for i, v := range info {
-			total_balance += balance[i]
-			total_temp += v.Temp[c] * balance[i]
+		for _, v := range info {
+			//fmt.Println("hey",balance[v.City])
+			//fmt.Println("ho",v.Temp[c])
+			total_balance += balance[v.City]
+			total_temp += v.Temp[c] * balance[v.City]
 		}
+		fmt.Println("temp",total_temp)
+		fmt.Println("balace",total_balance)
+			// cut off 2 decimal
+			var untruncated float64 = total_temp / total_balance
+			truncated := float64(int(untruncated*100)) / 100
 
-		// cut off 2 decimal
-		var untruncated float64 = total_temp/total_balance
-		truncated := float64(int(untruncated * 100)) / 100
+			forecast_celsius = append(forecast_celsius, truncated)
+		}
+		fmt.Println("hey", forecast_celsius)
 
-		forecast_celsius = append(forecast_celsius, truncated)
-	}
 	return forecast_celsius
 }
+
 
 func Calculate_rain(balance []float64, info []city_structs.CityInfo) []float64 {
 
@@ -285,7 +303,7 @@ func PostCity(c *gin.Context) {
 
 }
 // TODO használjunk visszatérési érték változónevet is. (ready)
-func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int64) (filtered_cities []city_structs.CityInfo) {
+func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int64) (filtered_cities map[string]city_structs.CityInfo) {
 	// TODO én MAP ez használnék ahol a város neve a kulcs  (? miert)
 	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
 
@@ -309,33 +327,33 @@ func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int
 
 	fmt.Println("map data")
 	fmt.Println(cities_distance)
+	//
+	//var order_by_time_cites CitiesInfo
+	////var filtered_cities city_structs.CitiesInfo // TODO
+	//
+	//for _, v := range all_cities {
+	//	order_by_time_cites = append(order_by_time_cites, v)
+	//}
+	//
+	//for i, _ := range order_by_time_cites {
+	//
+	//	order_by_time_cites[i].Timestamp -= timestamp
+	//	if order_by_time_cites[i].Timestamp < 0 {
+	//		order_by_time_cites[i].Timestamp *= -1
+	//	}
+	//}
+	//
+	//sort.Sort(order_by_time_cites)
+	//
+	//for i, v := range order_by_time_cites {
+	//
+	//	if contains(filtered_cities, v) == false {
+	//		order_by_time_cites[i].Timestamp += timestamp
+	//		filtered_cities = append(filtered_cities, order_by_time_cites[i])
+	//	}
+	//}
 
-	var order_by_time_cites CitiesInfo
-	//var filtered_cities city_structs.CitiesInfo // TODO
-
-	for _, v := range all_cities {
-		order_by_time_cites = append(order_by_time_cites, v)
-	}
-
-	for i, _ := range order_by_time_cites {
-
-		order_by_time_cites[i].Timestamp -= timestamp
-		if order_by_time_cites[i].Timestamp < 0 {
-			order_by_time_cites[i].Timestamp *= -1
-		}
-	}
-
-	sort.Sort(order_by_time_cites)
-
-	for i, v := range order_by_time_cites {
-
-		if contains(filtered_cities, v) == false {
-			order_by_time_cites[i].Timestamp += timestamp
-			filtered_cities = append(filtered_cities, order_by_time_cites[i])
-		}
-	}
-
-	return filtered_cities
+	return cities_distance
 }
 
 
