@@ -1,6 +1,6 @@
 package city_structs
-// TODO gorm? nem szükséges egyelőre sehová, ezeket tisztítsuk ki
-// TODO form ot használjuk valamire?
+// TODO gorm? nem szükséges egyelőre sehová, ezeket tisztítsuk ki (ready)
+// TODO form ot használjuk valamire? (ready)
 // ebből a sorból töröltem a, amit már végrehajtottál
 
 type CityInfo struct {
@@ -8,7 +8,7 @@ type CityInfo struct {
 	Geo       Geo
 	Temp      [5]float64 `json:"Temp"`
 	Rain      [5]float64 `json:"Rain"`
-	Timestamp int64      `json:"Timestamp"` // TODO olvashatóság kedvéért legyen space a form és a json között
+	Timestamp int64      `json:"Timestamp"` // TODO olvashatóság kedvéért legyen space a form és a json között (ready)
 }
 
 type CitiesInfo []CityInfo
