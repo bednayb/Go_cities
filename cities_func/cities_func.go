@@ -13,9 +13,10 @@ import (
 	"sort"
 )
 
-// TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük!
-// TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük
-// TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor
+// TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (? ezekhez nem kene egy adatbazis)
+// TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (? ezekhez nem kene egy adatbazis )
+// TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? ez full kodos :))
+// (?)
 func GetCities(c *gin.Context) {
 	c.JSON(200, mock_data.All_Cities)
 }
@@ -246,6 +247,22 @@ func Calculate_rain(balance []float64, info []city_structs.CityInfo) []float64 {
 	return forecast_rain
 }
 
+// TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy (ready)
+// egyben látszódjon egy egy adattípusról, hogy mik az elemei és mik a rá definiált fugvények  (?)
+// order Cities by Timestamp
+func (slice CitiesInfo) Len() int {
+	return len(slice)
+}
+
+func (slice CitiesInfo) Less(i, j int) bool {
+	return slice[i].Timestamp < slice[j].Timestamp;
+}
+
+func (slice CitiesInfo) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
+
 func PostCity(c *gin.Context) {
 
 	var json city_structs.CityInfo
@@ -269,7 +286,7 @@ func PostCity(c *gin.Context) {
 }
 // TODO használjunk visszatérési érték változónevet is. (ready)
 func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int64) (filtered_cities []city_structs.CityInfo) {
-	// TODO én MAP ez használnék ahol a város neve a kulcs
+	// TODO én MAP ez használnék ahol a város neve a kulcs  (? miert)
 	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
 
 	var order_by_time_cites CitiesInfo
@@ -300,21 +317,8 @@ func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int
 	return filtered_cities
 }
 
-// TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy
-// egyben látszódjon egy egy adattípusról, hogy mik az elemei és mik a rá definiált fugvények
 
-//// order Cities by Timestamp
-func (slice CitiesInfo) Len() int {
-	return len(slice)
-}
 
-func (slice CitiesInfo) Less(i, j int) bool {
-	return slice[i].Timestamp < slice[j].Timestamp;
-}
-
-func (slice CitiesInfo) Swap(i, j int) {
-	slice[i], slice[j] = slice[j], slice[i]
-}
 
 func contains(intSlice city_structs.CitiesInfo, searchInt city_structs.CityInfo) bool {
 	for _, value := range intSlice {
