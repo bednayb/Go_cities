@@ -1,5 +1,5 @@
 package main
-// TODO a main go a főkönyvtárvban szokott lenni általában
+// TODO a main go a főkönyvtárvban szokott lenni általában (ready)
 import (
 	"github.com/bednayb/Go_cities/cities_func"
 	"github.com/gin-gonic/gin"
@@ -14,7 +14,7 @@ func main() {
 		// find specific city by name
 		v1.GET("/city/:name", cities_func.GetCityName)
 		// make forecast for exact place
-		v1.GET("/avg", cities_func.GetCordinate)
+		v1.GET("/avg", cities_func.GetExpectedForecast)
 		// add new city
 		v1.POST("/push", cities_func.PostCity)
 	}
