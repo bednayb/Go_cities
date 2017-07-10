@@ -289,6 +289,27 @@ func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int
 	// TODO én MAP ez használnék ahol a város neve a kulcs  (? miert)
 	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
 
+	cities_distance := make(map[string]city_structs.CityInfo)
+
+	for _, v := range all_cities {
+
+		old_data_city_distance_time :=  cities_distance[v.City].Timestamp -timestamp
+		if old_data_city_distance_time < 0 {
+			old_data_city_distance_time *= -1
+		}
+		new_data_city_distance_time := v.Timestamp -timestamp
+		if new_data_city_distance_time < 0 {
+			new_data_city_distance_time*= -1
+		}
+
+		if old_data_city_distance_time > new_data_city_distance_time {
+			cities_distance[v.City] = v
+		}
+	}
+
+	fmt.Println("map data")
+	fmt.Println(cities_distance)
+
 	var order_by_time_cites CitiesInfo
 	//var filtered_cities city_structs.CitiesInfo // TODO
 
