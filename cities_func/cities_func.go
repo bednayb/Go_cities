@@ -3,6 +3,7 @@ package cities_func
 import (
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/bednayb/Go_cities/city_structs"
 	"github.com/bednayb/Go_cities/city_db"
 	"math"
@@ -76,6 +77,12 @@ func GetCityName(c *gin.Context) {
 
 // TODO ennek a fügvénynek a neve nem tükrözi hogy valójában mit csinál  (ready)
 func GetExpectedForecast(c *gin.Context) {
+
+	if len(Db_or_Mock) == 0{
+		content := gin.H{"response":"sry we havnt had enough data for calculating yet"}
+		c.JSON(200, content)
+		return
+	}
 
 	// save data from URL
 	lat := c.Query("lat")
