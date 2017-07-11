@@ -26,7 +26,6 @@ func TestCheck_distance(t *testing.T) {
 
 //func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int64) (filtered_cities map[string]city_structs.CityInfo)
 func TestNearest_city_data_in_time(t *testing.T) {
-	// todo not dry make one outside
 
 	var timestamp int64 = 1000
 
@@ -46,7 +45,6 @@ func TestNearest_city_data_in_time(t *testing.T) {
 		t.Fatal("doesnt equal result:", resultCities, "expected_value:", expectedValue)
 	}
 }
-//func Balanced_distance(distances map[string]float64) (balance_by_distance map[string]float64) {
 
 func TestBalanced_distance(t *testing.T) {
 
@@ -60,15 +58,12 @@ func TestBalanced_distance(t *testing.T) {
 	expectedValue["becs"] = 0.5
 	expectedValue["sopron"] = 0
 
-	// two data (should be 0 and 1)
 	resultCities := Balanced_distance(cityDistance)
 
 	if false == reflect.DeepEqual(resultCities, expectedValue) {
 		t.Fatal("doesnt equal result:", resultCities, "expected_value:", expectedValue)
 	}
 }
-
-//func Calculate_temps(balance map[string]float64, city_info map[string]city_structs.CityInfo) (forecast_temp []float64) {
 
 func TestCalculate_temps(t *testing.T) {
 
@@ -81,9 +76,9 @@ func TestCalculate_temps(t *testing.T) {
 
 	city_info := make(map[string]city_structs.CityInfo)
 
-	city_info["bp"] = city_structs.CityInfo{"bp", city_structs.Geo{94, 92}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 1100}
-	city_info["becs"] = city_structs.CityInfo{"becs", city_structs.Geo{94, 92}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 1100}
-	city_info["sopron"] = city_structs.CityInfo{"sopron", city_structs.Geo{94, 92}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 1100}
+	city_info["bp"] = city_structs.CityInfo{"bp", city_structs.Geo{94, 92}, [5]float64{100, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 1100}
+	city_info["becs"] = city_structs.CityInfo{"becs", city_structs.Geo{94, 92}, [5]float64{10, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 1100}
+	city_info["sopron"] = city_structs.CityInfo{"sopron", city_structs.Geo{94, 92}, [5]float64{25, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 1100}
 
 	resultTemps := Calculate_temps(balance, city_info)
 
