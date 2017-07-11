@@ -1,36 +1,32 @@
 package cities_func
 
 import (
-
-	"github.com/gin-gonic/gin"
-
-	"github.com/bednayb/Go_cities/city_structs"
+	"flag"
 	"github.com/bednayb/Go_cities/city_db"
+	"github.com/bednayb/Go_cities/city_structs"
+	"github.com/bednayb/Go_cities/mock_data"
+	"github.com/gin-gonic/gin"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
-	"flag"
-	"github.com/bednayb/Go_cities/mock_data"
-
 )
 
-// TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (? ezekhez nem kene egy adatbazis)
-// TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (? ezekhez nem kene egy adatbazis )
+// TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
+// TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (ready, test not works)
 // TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? ez full kodos :))
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 
-
 var Db_or_Mock []city_structs.CityInfo
 
-func IsMock()[]city_structs.CityInfo{
+func IsMock() []city_structs.CityInfo {
 
 	var mock = flag.String("mock", "", "placeholder")
 	flag.Parse()
-	if *mock == "true"{
+	if *mock == "true" {
 		Db_or_Mock = mock_data.All_Cities
 		return mock_data.All_Cities
-	}else{
+	} else {
 		Db_or_Mock = city_db.All_Cities
 		return city_db.All_Cities
 	}
@@ -78,8 +74,8 @@ func GetCityName(c *gin.Context) {
 // TODO ennek a fügvénynek a neve nem tükrözi hogy valójában mit csinál  (ready)
 func GetExpectedForecast(c *gin.Context) {
 
-	if len(Db_or_Mock) == 0{
-		content := gin.H{"response":"sry we havnt had enough data for calculating yet"}
+	if len(Db_or_Mock) == 0 {
+		content := gin.H{"response": "sry we havnt had enough data for calculating yet"}
 		c.JSON(200, content)
 		return
 	}
