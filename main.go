@@ -6,6 +6,14 @@ import (
 )
 
 func main() {
+
+	// check use mocking db or not
+	// if you want to use mock data  run your program with this codeline:
+	//run go run main.go -mock true
+	//else
+	// go run main.go
+	cities_func.IsMock()
+
 	r := gin.Default()
 	v1 := r.Group("/")
 	{
