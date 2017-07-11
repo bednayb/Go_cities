@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"fmt"
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
@@ -18,6 +20,8 @@ import (
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 
 var Db_or_Mock []city_structs.CityInfo
+var wg sync.WaitGroup
+
 
 func IsMock() []city_structs.CityInfo {
 
@@ -149,9 +153,51 @@ func GetExpectedForecast(c *gin.Context) {
 	// filter for the nearest data (by timestamp)
 	var filtered_cities = Nearest_city_data_in_time(Db_or_Mock, timestamp_int)
 
+
+	// Channels
+
+	//cut two half filtered_cities
+	var map_1 = make(map[string]city_structs.CityInfo)
+	var map_2 = make(map[string]city_structs.CityInfo)
+	cutter := 0
+	for key, val := range filtered_cities {
+		if cutter % 2 == 0{
+			map_1[key] = val
+		}else{
+			map_2[key] = val
+		}
+		cutter += 1
+	}
+	fmt.Println("i am map1")
+	fmt.Println(map_1)
+	fmt.Println("i am map2")
+	fmt.Println(map_2)
+
+	var distance_channel map[string]float64
+	wg.Add(2)
+
+	c1:= Check_distance_channels(present_data,map_1)
+	c2:= Check_distance_channels(present_data,map_2)
+
+
+	for n := range merge(c1, c2) {
+		fmt.Println("i am n ",n)
+		if len(n) == len(map_2) {
+			distance_channel = n
+		}
+	}
+
+	wg.Wait()
+	fmt.Println("i am distance channel")
+	fmt.Println(distance_channel)
+	fmt.Println(len(distance_channel))
+
+
+
 	// count all distances
 	var distances map[string]float64 = Check_distance(present_data, filtered_cities)
-
+	fmt.Println("i am the real distance")
+	fmt.Println(distances)
 	// balanced the distances
 	var balance map[string]float64 = Balanced_distance(distances)
 
@@ -220,7 +266,6 @@ func Balanced_distance(distances map[string]float64) (balance_by_distance map[st
 	return distances
 }
 
-// todo refactor calculate_temps and calulate_rain to one function
 func Calculate_temps(balance map[string]float64, city_info map[string]city_structs.CityInfo) (forecast_temp []float64) {
 
 	// container for temps
@@ -340,3 +385,59 @@ func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int
 }
 
 type CitiesInfo []city_structs.CityInfo
+
+//////Chanels /////
+
+
+func Check_distance_channels(cordinate city_structs.Cordinate_and_time, info map[string]city_structs.CityInfo) <-chan map[string]float64 {
+	// container for distance
+	c := make(chan map[string]float64)
+
+	var cities_distance = make(map[string]float64)
+
+	go func(){
+		for _, info := range info {
+			//pitágoras
+			dis_lat := cordinate.Lat - info.Geo.Lat
+			dis_lng := cordinate.Lng - info.Geo.Lng
+
+			var distance float64
+			distance = math.Sqrt(math.Pow(dis_lat, 2) + math.Pow(dis_lng, 2))
+			cities_distance[info.City] = distance
+			c <- cities_distance
+		}
+
+		//fmt.Println(distances)
+		close(c)
+	}()
+	wg.Done()
+	return c
+}
+
+
+func merge(cs ...<-chan map[string]float64) <-chan map[string]float64 {
+	var wg sync.WaitGroup
+	out := make(chan map[string]float64)
+
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls wg.Done.
+	output := func(c <-chan map[string]float64) {
+		for n := range c {
+			out <- n
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	// Start a goroutine to close out once all the output goroutines are
+	// done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
