@@ -155,10 +155,29 @@ func GetExpectedForecast(c *gin.Context) {
 	var filtered_cities = Nearest_city_data_in_time(Db_or_Mock, timestamp_int)
 
 	// count all distances
-	var distances map[string]float64 = Check_distance(present_data, filtered_cities)
+	wg.Add(2)
+	var distances map[string]float64
+
+	city_half_1 := make(map[string]city_structs.CityInfo)
+	city_half_2 := make(map[string]city_structs.CityInfo)
+
+	cutter := 0
+	for key, val := range filtered_cities {
+		if cutter%2 == 0 {
+			city_half_1[key] = val
+		} else {
+			city_half_2[key] = val
+		}
+		cutter += 1
+	}
+
+	go Check_distance(present_data, city_half_1 ,&distances)
+	go Check_distance(present_data, city_half_2 ,&distances)
+	wg.Wait()
 
 	// balanced the distances
 	var balance map[string]float64 = Balanced_distance(distances)
+
 
 	// counting temps and raining data for next 5 days
 	wg.Add(2)
@@ -173,10 +192,10 @@ func GetExpectedForecast(c *gin.Context) {
 	c.JSON(200, content)
 }
 
-func Check_distance(cordinate city_structs.Cordinate_and_time, info map[string]city_structs.CityInfo) (city_distance map[string]float64) {
+func Check_distance(cordinate city_structs.Cordinate_and_time, info map[string]city_structs.CityInfo, a *map[string]float64) {
 
 	// container for distance  key --> city name, value --> distance
-	var cities_distance = make(map[string]float64)
+	var cities_distance= make(map[string]float64)
 
 	//count every distance of city (pitágoras)
 	var distance float64
@@ -188,8 +207,11 @@ func Check_distance(cordinate city_structs.Cordinate_and_time, info map[string]c
 		distance = math.Sqrt(math.Pow(dis_lat, 2) + math.Pow(dis_lng, 2))
 		cities_distance[info.City] = distance
 	}
-	return cities_distance
+
+	*a = merge_maps(*a,cities_distance)
+	wg.Done()
 }
+
 
 // linear interpolation (nearest 1 weight, furthest 0)
 func Balanced_distance(distances map[string]float64) (balance_by_distance map[string]float64) {
@@ -340,31 +362,6 @@ func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int
 		}
 	}
 	return cities_distance
-}
-
-func Check_distance_channels(cordinate city_structs.Cordinate_and_time, info map[string]city_structs.CityInfo) <-chan map[string]float64 {
-	// container for distance
-	c := make(chan map[string]float64, 2)
-
-	var cities_distance = make(map[string]float64)
-
-	go func() {
-		for _, info := range info {
-			//pitágoras
-			dis_lat := cordinate.Lat - info.Geo.Lat
-			dis_lng := cordinate.Lng - info.Geo.Lng
-
-			var distance float64
-			distance = math.Sqrt(math.Pow(dis_lat, 2) + math.Pow(dis_lng, 2))
-			cities_distance[info.City] = distance
-			c <- cities_distance
-		}
-
-		//fmt.Println(distances)
-		close(c)
-	}()
-	wg.Done()
-	return c
 }
 
 // linear interpolation (nearest 1 weight, furthest 0)
