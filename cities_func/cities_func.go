@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"fmt"
+
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
@@ -159,6 +160,7 @@ func GetExpectedForecast(c *gin.Context) {
 	//cut two half filtered_cities
 	var map_1 = make(map[string]city_structs.CityInfo)
 	var map_2 = make(map[string]city_structs.CityInfo)
+
 	cutter := 0
 	for key, val := range filtered_cities {
 		if cutter % 2 == 0{
@@ -168,29 +170,23 @@ func GetExpectedForecast(c *gin.Context) {
 		}
 		cutter += 1
 	}
-	fmt.Println("i am map1")
-	fmt.Println(map_1)
-	fmt.Println("i am map2")
-	fmt.Println(map_2)
 
-	var distance_channel map[string]float64
 	wg.Add(2)
 
 	c1:= Check_distance_channels(present_data,map_1)
 	c2:= Check_distance_channels(present_data,map_2)
 
+	x:= <-c1
+	y:= <-c2
 
-	for n := range merge(c1, c2) {
-		fmt.Println("i am n ",n)
-		if len(n) == len(map_2) {
-			distance_channel = n
-		}
+	for k, v := range x {
+		y[k] = v
 	}
+	fmt.Println("channels result")
+	fmt.Println(y)
 
 	wg.Wait()
-	fmt.Println("i am distance channel")
-	fmt.Println(distance_channel)
-	fmt.Println(len(distance_channel))
+
 
 
 
@@ -391,7 +387,7 @@ type CitiesInfo []city_structs.CityInfo
 
 func Check_distance_channels(cordinate city_structs.Cordinate_and_time, info map[string]city_structs.CityInfo) <-chan map[string]float64 {
 	// container for distance
-	c := make(chan map[string]float64)
+	c := make(chan map[string]float64,2)
 
 	var cities_distance = make(map[string]float64)
 
@@ -415,29 +411,29 @@ func Check_distance_channels(cordinate city_structs.Cordinate_and_time, info map
 }
 
 
-func merge(cs ...<-chan map[string]float64) <-chan map[string]float64 {
-	var wg sync.WaitGroup
-	out := make(chan map[string]float64)
-
-	// Start an output goroutine for each input channel in cs.  output
-	// copies values from c to out until c is closed, then calls wg.Done.
-	output := func(c <-chan map[string]float64) {
-		for n := range c {
-			out <- n
-		}
-		wg.Done()
-	}
-	wg.Add(len(cs))
-	for _, c := range cs {
-		go output(c)
-	}
-
-	// Start a goroutine to close out once all the output goroutines are
-	// done.  This must start after the wg.Add call.
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
-}
+//func merge(cs ...<-chan map[string]float64) <-chan map[string]float64 {
+//	var wg sync.WaitGroup
+//	out := make(chan map[string]float64)
+//
+//	// Start an output goroutine for each input channel in cs.  output
+//	// copies values from c to out until c is closed, then calls wg.Done.
+//	output := func(c <-chan map[string]float64) {
+//		for n := range c {
+//			out <- n
+//		}
+//		wg.Done()
+//	}
+//	wg.Add(len(cs))
+//	for _, c := range cs {
+//		go output(c)
+//	}
+//
+//	// Start a goroutine to close out once all the output goroutines are
+//	// done.  This must start after the wg.Add call.
+//	go func() {
+//		wg.Wait()
+//		close(out)
+//	}()
+//	return out
+//}
 
