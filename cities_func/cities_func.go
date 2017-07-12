@@ -16,30 +16,40 @@ import (
 // TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (ready, test not works)
 // TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? ez full kodos :))
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
+// Zoli -->  add config  https://github.com/spf13/viper
+var City_Database []city_structs.CityInfo
 
-var Db_or_Mock []city_structs.CityInfo
+func ConfigSettings(config_file *string) {
 
-func IsMock() []city_structs.CityInfo {
-
-	var mock = flag.String("mock", "", "placeholder")
+	var config = flag.String("config", "", "placeholder")
 	flag.Parse()
-	if *mock == "true" {
-		Db_or_Mock = mock_data.All_Cities
-		return mock_data.All_Cities
+	if *config == "mock" {
+		*config_file = "mock"
+	} else if *config == "test" {
+		*config_file = "test"
 	} else {
-		Db_or_Mock = city_db.All_Cities
-		return city_db.All_Cities
+		*config_file = "basic"
+	}
+}
+
+func Init(conf string) {
+	if conf == "mock" {
+		City_Database = mock_data.All_Cities
+	} else if conf == "test" {
+		City_Database = mock_data.All_Cities
+	} else {
+		City_Database = city_db.All_Cities
 	}
 }
 
 func GetCities(c *gin.Context) {
-	cities := Db_or_Mock
+	cities := City_Database
 	c.JSON(200, cities)
 }
 
 func GetCityName(c *gin.Context) {
 
-	cities := Db_or_Mock
+	cities := City_Database
 	// find city's name from url
 	name := c.Params.ByName("name")
 	// bool for checking city is exist in our db
@@ -74,7 +84,7 @@ func GetCityName(c *gin.Context) {
 // TODO ennek a fügvénynek a neve nem tükrözi hogy valójában mit csinál  (ready)
 func GetExpectedForecast(c *gin.Context) {
 
-	if len(Db_or_Mock) == 0 {
+	if len(City_Database) == 0 {
 		content := gin.H{"response": "sry we havnt had enough data for calculating yet"}
 		c.JSON(200, content)
 		return
@@ -147,7 +157,7 @@ func GetExpectedForecast(c *gin.Context) {
 	var present_data = city_structs.Cordinate_and_time{lat_float64, lng_float64, timestamp_int}
 
 	// filter for the nearest data (by timestamp)
-	var filtered_cities = Nearest_city_data_in_time(Db_or_Mock, timestamp_int)
+	var filtered_cities = Nearest_city_data_in_time(City_Database, timestamp_int)
 
 	// count all distances
 	var distances map[string]float64 = Check_distance(present_data, filtered_cities)
@@ -305,7 +315,7 @@ func PostCity(c *gin.Context) {
 		}
 	}
 
-	Db_or_Mock = append(Db_or_Mock, json)
+	City_Database = append(City_Database, json)
 
 	content := gin.H{
 		"result": "successful saving",

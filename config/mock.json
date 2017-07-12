@@ -1,0 +1,5 @@
+{
+    "mock": {
+        "database": "mock_db"
+    }
+}
