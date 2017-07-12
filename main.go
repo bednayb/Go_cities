@@ -10,7 +10,7 @@ func main() {
 
 	// if you want to use mock data  run your program with this codeline: run go run main.go -mock true
 	//else   go run main.go
-	cities_func.Switch_db()
+	cities_func.Choose_db()
 
 	r := gin.Default()
 	v1 := r.Group("/")

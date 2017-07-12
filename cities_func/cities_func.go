@@ -24,7 +24,7 @@ var Db_or_Mock []city_structs.CityInfo
 var wg sync.WaitGroup
 
 
-func Switch_db() []city_structs.CityInfo {
+func Choose_db() []city_structs.CityInfo {
 
 	var mock = flag.String("mock", "", "placeholder")
 	flag.Parse()
