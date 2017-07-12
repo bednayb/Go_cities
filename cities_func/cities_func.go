@@ -24,7 +24,7 @@ var Db_or_Mock []city_structs.CityInfo
 var wg sync.WaitGroup
 
 
-func IsMock() []city_structs.CityInfo {
+func Switch_db() []city_structs.CityInfo {
 
 	var mock = flag.String("mock", "", "placeholder")
 	flag.Parse()
@@ -179,11 +179,10 @@ func GetExpectedForecast(c *gin.Context) {
 	x:= <-c1
 	y:= <-c2
 
-	for k, v := range x {
-		y[k] = v
-	}
+	result := merge_maps(x,y)
+
 	fmt.Println("channels result")
-	fmt.Println(y)
+	fmt.Println(result)
 
 	wg.Wait()
 
@@ -408,6 +407,13 @@ func Check_distance_channels(cordinate city_structs.Cordinate_and_time, info map
 	}()
 	wg.Done()
 	return c
+}
+
+func merge_maps(x map[string]float64,y map[string]float64)(map[string]float64){
+	for k, v := range x {
+		y[k] = v
+	}
+	return y
 }
 
 
