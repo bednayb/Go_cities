@@ -2,7 +2,7 @@ package cities_func
 
 import (
 	"flag"
-	"fmt"
+	//"fmt"
 	"github.com/bednayb/Go_cities/city_db"
 	"github.com/bednayb/Go_cities/city_structs"
 	"github.com/bednayb/Go_cities/mock_data"
@@ -154,44 +154,19 @@ func GetExpectedForecast(c *gin.Context) {
 	// filter for the nearest data (by timestamp)
 	var filtered_cities = Nearest_city_data_in_time(Db_or_Mock, timestamp_int)
 
-	// Channels
-
-	//cut two half filtered_cities
-	var map_1 = make(map[string]city_structs.CityInfo)
-	var map_2 = make(map[string]city_structs.CityInfo)
-
-	cutter := 0
-	for key, val := range filtered_cities {
-		if cutter%2 == 0 {
-			map_1[key] = val
-		} else {
-			map_2[key] = val
-		}
-		cutter += 1
-	}
-
-	wg.Add(2)
-
-	c1 := Check_distance_channels(present_data, map_1)
-	c2 := Check_distance_channels(present_data, map_2)
-
-	x := <-c1
-	y := <-c2
-
-	result := merge_maps(x, y)
-	fmt.Println(result)
-	wg.Wait()
-
 	// count all distances
 	var distances map[string]float64 = Check_distance(present_data, filtered_cities)
-	fmt.Println("i am the real distance")
-	fmt.Println(distances)
+
 	// balanced the distances
 	var balance map[string]float64 = Balanced_distance(distances)
 
-	// count the forecast data
-	var forecast_celsius []float64 = Calculate_temps(balance, filtered_cities)
-	var forecast_rain []float64 = Calculate_rain(balance, filtered_cities)
+	// counting temps and raining data for next 5 days
+	wg.Add(2)
+	var forecast_rain []float64
+	var forecast_celsius []float64
+	go Calculate_rain_chan(balance,filtered_cities,&forecast_rain)
+	go Calculate_temp_chan(balance,filtered_cities,&forecast_celsius)
+	wg.Wait()
 
 	// send data
 	content := gin.H{"expected celsius next 5 days": forecast_celsius, "expected rainning chance next 5 days": forecast_rain}
@@ -307,6 +282,56 @@ func Calculate_rain(balance map[string]float64, city_info map[string]city_struct
 	return forecast_rain
 }
 
+func Calculate_rain_chan(balance map[string]float64, city_info map[string]city_structs.CityInfo,a *[]float64) {
+
+	var total_balance float64
+	var total_temp float64
+
+	// count next five days
+	for day := 0; day < 5; day++ {
+		total_balance = 0
+		total_temp = 0
+		// info --> every city
+		for _, v := range city_info {
+			total_balance += balance[v.City]
+			total_temp += v.Rain[day] * balance[v.City]
+		}
+		// cut off 2 decimal
+		var untruncated float64 = total_temp / total_balance
+		truncated := float64(int(untruncated*100)) / 100
+		// put data to container
+		*a = append(*a,truncated)
+	}
+	wg.Done()
+
+}
+
+func Calculate_temp_chan(balance map[string]float64, city_info map[string]city_structs.CityInfo,a *[]float64) {
+
+	var total_balance float64
+	var total_temp float64
+
+	// count next five days
+	for day := 0; day < 5; day++ {
+		total_balance = 0
+		total_temp = 0
+		// info --> every city
+		for _, v := range city_info {
+			total_balance += balance[v.City]
+			total_temp += v.Temp[day] * balance[v.City]
+		}
+		// cut off 2 decimal
+		var untruncated float64 = total_temp / total_balance
+		truncated := float64(int(untruncated*100)) / 100
+		// put data to container
+		*a = append(*a,truncated)
+
+	}
+	wg.Done()
+
+}
+
+
 // TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy (ready)
 // egyben látszódjon egy egy adattípusról, hogy mik az elemei és mik a rá definiált fugvények  (?)
 // order Cities by Timestamp
@@ -397,6 +422,7 @@ func Check_distance_channels(cordinate city_structs.Cordinate_and_time, info map
 	return c
 }
 
+// linear interpolation (nearest 1 weight, furthest 0)
 func merge_maps(x map[string]float64, y map[string]float64) map[string]float64 {
 	for k, v := range x {
 		y[k] = v
