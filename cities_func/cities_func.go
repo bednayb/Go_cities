@@ -164,8 +164,8 @@ func GetExpectedForecast(c *gin.Context) {
 	wg.Add(2)
 	var forecast_rain []float64
 	var forecast_celsius []float64
-	go Calculate_rain_chan(balance,filtered_cities,&forecast_rain)
-	go Calculate_temp_chan(balance,filtered_cities,&forecast_celsius)
+	go Calculate_rain(balance,filtered_cities,&forecast_rain)
+	go Calculate_temp(balance,filtered_cities,&forecast_celsius)
 	wg.Wait()
 
 	// send data
@@ -229,60 +229,7 @@ func Balanced_distance(distances map[string]float64) (balance_by_distance map[st
 	return distances
 }
 
-func Calculate_temps(balance map[string]float64, city_info map[string]city_structs.CityInfo) (forecast_temp []float64) {
-
-	// container for temps
-	var forecast_celsius []float64
-
-	var total_balance float64
-	var total_temp float64
-
-	// count next five days
-	for day := 0; day < 5; day++ {
-		total_balance = 0
-		total_temp = 0
-		// info --> every city
-		for _, v := range city_info {
-			total_balance += balance[v.City]
-			total_temp += v.Temp[day] * balance[v.City]
-		}
-		// cut off 2 decimal
-		var untruncated float64 = total_temp / total_balance
-		truncated := float64(int(untruncated*100)) / 100
-		// put data to container
-		forecast_celsius = append(forecast_celsius, truncated)
-	}
-
-	return forecast_celsius
-}
-
-func Calculate_rain(balance map[string]float64, city_info map[string]city_structs.CityInfo) (forecast_temp []float64) {
-
-	// container for temps
-	var forecast_rain []float64
-
-	var total_balance float64
-	var total_temp float64
-
-	// count next five days
-	for day := 0; day < 5; day++ {
-		total_balance = 0
-		total_temp = 0
-		// info --> every city
-		for _, v := range city_info {
-			total_balance += balance[v.City]
-			total_temp += v.Rain[day] * balance[v.City]
-		}
-		// cut off 2 decimal
-		var untruncated float64 = total_temp / total_balance
-		truncated := float64(int(untruncated*100)) / 100
-		// put data to container
-		forecast_rain = append(forecast_rain, truncated)
-	}
-	return forecast_rain
-}
-
-func Calculate_rain_chan(balance map[string]float64, city_info map[string]city_structs.CityInfo,a *[]float64) {
+func Calculate_rain(balance map[string]float64, city_info map[string]city_structs.CityInfo,a *[]float64) {
 
 	var total_balance float64
 	var total_temp float64
@@ -306,7 +253,7 @@ func Calculate_rain_chan(balance map[string]float64, city_info map[string]city_s
 
 }
 
-func Calculate_temp_chan(balance map[string]float64, city_info map[string]city_structs.CityInfo,a *[]float64) {
+func Calculate_temp(balance map[string]float64, city_info map[string]city_structs.CityInfo,a *[]float64) {
 
 	var total_balance float64
 	var total_temp float64
@@ -328,9 +275,7 @@ func Calculate_temp_chan(balance map[string]float64, city_info map[string]city_s
 
 	}
 	wg.Done()
-
 }
-
 
 // TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy (ready)
 // egyben látszódjon egy egy adattípusról, hogy mik az elemei és mik a rá definiált fugvények  (?)
