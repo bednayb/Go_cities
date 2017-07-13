@@ -1,5 +1,5 @@
 {
-    "basic": {
+    "production": {
         "database": "city_db"
     }
 }

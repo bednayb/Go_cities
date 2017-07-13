@@ -1,5 +1,5 @@
 {
-    "mock": {
+    "development": {
         "database": "mock_db"
     }
 }

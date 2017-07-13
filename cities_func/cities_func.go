@@ -23,17 +23,17 @@ func ConfigSettings(config_file *string) {
 
 	var config = flag.String("config", "", "placeholder")
 	flag.Parse()
-	if *config == "mock" {
-		*config_file = "mock"
+	if *config == "development" {
+		*config_file = "development"
 	} else if *config == "test" {
 		*config_file = "test"
 	} else {
-		*config_file = "basic"
+		*config_file = "production"
 	}
 }
 
 func Init(conf string) {
-	if conf == "mock" {
+	if conf == "development" {
 		City_Database = mock_data.All_Cities
 	} else if conf == "test" {
 		City_Database = mock_data.All_Cities
