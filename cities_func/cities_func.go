@@ -154,9 +154,11 @@ func GetExpectedForecast(c *gin.Context) {
 	var distances map[string]float64 = CountDistance(presentData, filteredCities)
 
 	// balanced the distances
+
 	var balance map[string]float64 = BalanceDistance(distances)
 
 	// count the forecast data
+
 	var forecastCelsius []float64 = CalculateTemps(balance, filteredCities)
 	var forecastRain []float64 = CalculateRain(balance, filteredCities)
 
@@ -325,11 +327,12 @@ func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int
 		if newDataCityDistanceTime < 0 {
 			newDataCityDistanceTime *= -1
 		}
-
-		if oldDataCityDistanceTime > newDataCityDistanceTime {
+		// saved if the new data is nearer or the city doesnt exist (timestamp = 0)
+		if oldDataCityDistanceTime > newDataCityDistanceTime || filteredCities[v.City].Timestamp == 0 {
 			filteredCities[v.City] = v
 		}
 	}
+
 	return filteredCities
 }
 
