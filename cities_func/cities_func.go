@@ -14,45 +14,46 @@ import (
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
 // TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (ready, test not works)
-// TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? ez full kodos :))
+// TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? add_config_file_branch))
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
+// Zoli -->  add config  https://github.com/spf13/viper
 
-var Db_or_Mock []city_structs.CityInfo
+var Database []city_structs.CityInfo
 
-func IsMock() []city_structs.CityInfo {
+func SelectDatabase() []city_structs.CityInfo {
 
 	var mock = flag.String("mock", "", "placeholder")
 	flag.Parse()
 	if *mock == "true" {
-		Db_or_Mock = mock_data.All_Cities
+		Database = mock_data.All_Cities
 		return mock_data.All_Cities
 	} else {
-		Db_or_Mock = city_db.All_Cities
+		Database = city_db.All_Cities
 		return city_db.All_Cities
 	}
 }
 
-func GetCities(c *gin.Context) {
-	cities := Db_or_Mock
+func GetAllCity(c *gin.Context) {
+	cities := Database
 	c.JSON(200, cities)
 }
 
-func GetCityName(c *gin.Context) {
+func GetCityByName(c *gin.Context) {
 
-	cities := Db_or_Mock
+	cities := Database
 	// find city's name from url
 	name := c.Params.ByName("name")
 	// bool for checking city is exist in our db
 	var redflag bool = true
 
 	// filtered cities order by timestamp (first the oldest)
-	var filtered_cities_by_time CitiesInfo
+	var filteredCitiesByTime CitiesInfo
 
 	// filtering cities by name
 	for _, v := range cities {
 		if v.City == name {
 			redflag = false
-			filtered_cities_by_time = append(filtered_cities_by_time, v)
+			filteredCitiesByTime = append(filteredCitiesByTime, v)
 		}
 	}
 	if redflag {
@@ -62,9 +63,9 @@ func GetCityName(c *gin.Context) {
 		return
 	} else {
 		// sorting cities
-		sort.Sort(filtered_cities_by_time)
+		sort.Sort(filteredCitiesByTime)
 		// response when city exist in our db
-		c.JSON(200, gin.H{"filtered_cities_by_time": filtered_cities_by_time})
+		c.JSON(200, gin.H{"filtered_cities_by_time": filteredCitiesByTime})
 		return
 	}
 	// TODO érdemes lenne mindkét if ágban egy return, hogy ide ne juthassunk el. (ready)
@@ -74,7 +75,7 @@ func GetCityName(c *gin.Context) {
 // TODO ennek a fügvénynek a neve nem tükrözi hogy valójában mit csinál  (ready)
 func GetExpectedForecast(c *gin.Context) {
 
-	if len(Db_or_Mock) == 0 {
+	if len(Database) == 0 {
 		content := gin.H{"response": "sry we havnt had enough data for calculating yet"}
 		c.JSON(200, content)
 		return
@@ -87,50 +88,50 @@ func GetExpectedForecast(c *gin.Context) {
 
 	// TODO Hiba ellenőrzéskor értelmes hibaüzenetet szeretnénk adni pontosan arról ami a hibát okozta (ready)
 
-	var data_doenst_exists_message string
+	var dataDoenstExistsMessage string
 
 	if lat == "" {
-		data_doenst_exists_message += "lat data must be exists, "
+		dataDoenstExistsMessage += "lat data must be exists, "
 	}
 	if lng == "" {
-		data_doenst_exists_message += "lng data must be exists, "
+		dataDoenstExistsMessage += "lng data must be exists, "
 	}
 	if timestamp == "" {
-		data_doenst_exists_message += "timestamp data must be exists"
+		dataDoenstExistsMessage += "timestamp data must be exists"
 	}
-	if len(data_doenst_exists_message) > 0 {
-		content := gin.H{"error_message": data_doenst_exists_message}
+	if len(dataDoenstExistsMessage) > 0 {
+		content := gin.H{"error_message": dataDoenstExistsMessage}
 		c.JSON(400, content)
 		// TODO itt érdemes lenne egy return, hogy ne folytassuk a futást ha hiba volt  (ready)
 		return
 	}
 
 	//Convert to float64/int
-	var convert_problem string
-	lat_float64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
+	var convertProblemMessage string
+	latitudeFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
 
-	if lat != "0" && lat_float64 == 0 {
-		convert_problem += "invalid lat data (not number), "
+	if lat != "0" && latitudeFloat64 == 0 {
+		convertProblemMessage += "invalid lat data (not number), "
 	}
 
-	lng_float64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
-	if lat != "0" && lng_float64 == 0 {
-		convert_problem += "invalid lng data (not number), "
+	longitudeFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
+	if lat != "0" && longitudeFloat64 == 0 {
+		convertProblemMessage += "invalid lng data (not number), "
 	}
 
-	timestamp_int, _ := strconv.ParseInt(timestamp, 10, 64)
-	if lat != "0" && timestamp_int == 0 {
-		convert_problem += "invalid timestamp data (not number) "
+	timestampInt, _ := strconv.ParseInt(timestamp, 10, 64)
+	if lat != "0" && timestampInt == 0 {
+		convertProblemMessage += "invalid timestamp data (not number) "
 	}
 
-	if len(convert_problem) > 0 {
-		content := gin.H{"error_message ": convert_problem}
+	if len(convertProblemMessage) > 0 {
+		content := gin.H{"error_message ": convertProblemMessage}
 		c.JSON(400, content)
 		// TODO itt érdemes lenne egy return, hogy ne folytassuk a futást ha hiba volt  (ready)
 		return
 	}
 
-	if timestamp_int < 0 {
+	if timestampInt < 0 {
 		content := gin.H{"error_message ": "timestamp should be bigger than 0"}
 		c.JSON(400, content)
 		// TODO itt érdemes lenne egy return, hogy ne folytassuk a futást ha hiba volt  (ready)
@@ -144,114 +145,107 @@ func GetExpectedForecast(c *gin.Context) {
 	// hiba esetén itt se menjünk tovább.
 
 	// data from the URL
-	var present_data = city_structs.Cordinate_and_time{lat_float64, lng_float64, timestamp_int}
+	var presentData = city_structs.Cordinate_and_time{latitudeFloat64, longitudeFloat64, timestampInt}
 
 	// filter for the nearest data (by timestamp)
-	var filtered_cities = Nearest_city_data_in_time(Db_or_Mock, timestamp_int)
+	var filteredCities = Nearest_city_data_in_time(Database, timestampInt)
 
 	// count all distances
-	var distances map[string]float64 = Check_distance(present_data, filtered_cities)
+	var distances map[string]float64 = CountDistance(presentData, filteredCities)
 
 	// balanced the distances
-	var balance map[string]float64 = Balanced_distance(distances)
+	var balance map[string]float64 = BalanceDistance(distances)
 
 	// count the forecast data
-	var forecast_celsius []float64 = Calculate_temps(balance, filtered_cities)
-	var forecast_rain []float64 = Calculate_rain(balance, filtered_cities)
+	var forecastCelsius []float64 = CalculateTemps(balance, filteredCities)
+	var forecastRain []float64 = CalculateRain(balance, filteredCities)
 
 	// send data
-	content := gin.H{"expected celsius next 5 days": forecast_celsius, "expected rainning chance next 5 days": forecast_rain}
+	content := gin.H{"expected celsius next 5 days": forecastCelsius, "expected rainning chance next 5 days": forecastRain}
 	c.JSON(200, content)
 }
 
-func Check_distance(cordinate city_structs.Cordinate_and_time, info map[string]city_structs.CityInfo) (city_distance map[string]float64) {
+func CountDistance(cordinate city_structs.Cordinate_and_time, info map[string]city_structs.CityInfo) (city_distance map[string]float64) {
 
 	// container for distance  key --> city name, value --> distance
-	var cities_distance = make(map[string]float64)
+	var citiesDistance = make(map[string]float64)
 
 	//count every distance of city (pitágoras)
 	var distance float64
 	for _, info := range info {
 
-		dis_lat := cordinate.Lat - info.Geo.Lat
-		dis_lng := cordinate.Lng - info.Geo.Lng
+		latitudeDistance := cordinate.Lat - info.Geo.Lat
+		longitudeDistance := cordinate.Lng - info.Geo.Lng
 
-		distance = math.Sqrt(math.Pow(dis_lat, 2) + math.Pow(dis_lng, 2))
-		cities_distance[info.City] = distance
+		distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
+		citiesDistance[info.City] = distance
 	}
-	return cities_distance
+	return citiesDistance
 }
 
 // linear interpolation (nearest 1 weight, furthest 0)
-func Balanced_distance(distances map[string]float64) (balance_by_distance map[string]float64) {
+func BalanceDistance(distances map[string]float64) (balance_by_distance map[string]float64) {
 
 	//  balanced distance
-	var balance_number float64
+	var balanceNumber float64
 
 	//// find furthest (biggest number)
-	var permanent_biggest float64
+	var permanentBiggest float64
 	var biggest float64 = 0
 
 	for _, v := range distances {
-		if v > permanent_biggest {
-			permanent_biggest = v
-			biggest = permanent_biggest
+		if v > permanentBiggest {
+			permanentBiggest = v
+			biggest = permanentBiggest
 		}
 	}
 	//find nearest (smallest number)
-	var permanent_smallest float64 = biggest
+	var permanentSmallest float64 = biggest
 	var smallest float64 = biggest
 
 	for _, v := range distances {
-		if v < permanent_smallest {
-			permanent_smallest = v
-			smallest = permanent_smallest
+		if v < permanentSmallest {
+			permanentSmallest = v
+			smallest = permanentSmallest
 		}
 	}
 	// calculate balanced numbers
 	for i, v := range distances {
-		balance_number = (v - smallest) / (biggest - smallest)
-		balance_number -= 1
-		balance_number *= -1
+		balanceNumber = (v - smallest) / (biggest - smallest)
+		balanceNumber -= 1
+		balanceNumber *= -1
 		// overwrite distance with balanced distance
-		distances[i] = balance_number
+		distances[i] = balanceNumber
 	}
 
 	return distances
 }
 
 // todo refactor calculate_temps and calulate_rain to one function
-func Calculate_temps(balance map[string]float64, city_info map[string]city_structs.CityInfo) (forecast_temp []float64) {
+func CalculateTemps(balance map[string]float64, cityInfo map[string]city_structs.CityInfo) (forecastCelsius []float64) {
 
-	// container for temps
-	var forecast_celsius []float64
-
-	var total_balance float64
-	var total_temp float64
+	var totalBalance float64
+	var totalTemp float64
 
 	// count next five days
 	for day := 0; day < 5; day++ {
-		total_balance = 0
-		total_temp = 0
+		totalBalance = 0
+		totalTemp = 0
 		// info --> every city
-		for _, v := range city_info {
-			total_balance += balance[v.City]
-			total_temp += v.Temp[day] * balance[v.City]
+		for _, v := range cityInfo {
+			totalBalance += balance[v.City]
+			totalTemp += v.Temp[day] * balance[v.City]
 		}
 		// cut off 2 decimal
-		var untruncated float64 = total_temp / total_balance
+		var untruncated float64 = totalTemp / totalBalance
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
-		forecast_celsius = append(forecast_celsius, truncated)
+		forecastCelsius = append(forecastCelsius, truncated)
 	}
-
-	return forecast_celsius
+	return forecastCelsius
 }
 
-func Calculate_rain(balance map[string]float64, city_info map[string]city_structs.CityInfo) (forecast_temp []float64) {
-
-	// container for temps
-	var forecast_rain []float64
+func CalculateRain(balance map[string]float64, city_info map[string]city_structs.CityInfo) (forecastRain []float64) {
 
 	var total_balance float64
 	var total_temp float64
@@ -269,9 +263,9 @@ func Calculate_rain(balance map[string]float64, city_info map[string]city_struct
 		var untruncated float64 = total_temp / total_balance
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
-		forecast_rain = append(forecast_rain, truncated)
+		forecastRain = append(forecastRain, truncated)
 	}
-	return forecast_rain
+	return forecastRain
 }
 
 // TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy (ready)
@@ -305,7 +299,7 @@ func PostCity(c *gin.Context) {
 		}
 	}
 
-	Db_or_Mock = append(Db_or_Mock, json)
+	Database = append(Database, json)
 
 	content := gin.H{
 		"result": "successful saving",
@@ -314,29 +308,29 @@ func PostCity(c *gin.Context) {
 }
 
 // TODO használjunk visszatérési érték változónevet is. (ready)
-func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int64) (filtered_cities map[string]city_structs.CityInfo) {
+func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int64) (filtered_Cities map[string]city_structs.CityInfo) {
 	// TODO én MAP ez használnék ahol a város neve a kulcs  (ready)
 	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
 
-	cities_distance := make(map[string]city_structs.CityInfo)
+	filteredCities := make(map[string]city_structs.CityInfo)
 
 	for _, v := range all_cities {
 
-		old_data_city_distance_time := cities_distance[v.City].Timestamp - timestamp
-		if old_data_city_distance_time < 0 {
-			old_data_city_distance_time *= -1
+		oldDataCityDistanceTime := filteredCities[v.City].Timestamp - timestamp
+		if oldDataCityDistanceTime < 0 {
+			oldDataCityDistanceTime *= -1
 		}
 
-		new_data_city_distance_time := v.Timestamp - timestamp
-		if new_data_city_distance_time < 0 {
-			new_data_city_distance_time *= -1
+		newDataCityDistanceTime := v.Timestamp - timestamp
+		if newDataCityDistanceTime < 0 {
+			newDataCityDistanceTime *= -1
 		}
 
-		if old_data_city_distance_time > new_data_city_distance_time {
-			cities_distance[v.City] = v
+		if oldDataCityDistanceTime > newDataCityDistanceTime {
+			filteredCities[v.City] = v
 		}
 	}
-	return cities_distance
+	return filteredCities
 }
 
 type CitiesInfo []city_structs.CityInfo

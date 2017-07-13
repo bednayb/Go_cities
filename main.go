@@ -12,15 +12,15 @@ func main() {
 	//run go run main.go -mock true
 	//else
 	// go run main.go
-	cities_func.IsMock()
+	cities_func.SelectDatabase()
 
 	r := gin.Default()
 	v1 := r.Group("/")
 	{
 		// list all cities
-		v1.GET("/cities", cities_func.GetCities)
+		v1.GET("/cities", cities_func.GetAllCity)
 		// find specific city by name
-		v1.GET("/city/:name", cities_func.GetCityName)
+		v1.GET("/city/:name", cities_func.GetCityByName)
 		// make forecast for exact place
 		v1.GET("/avg", cities_func.GetExpectedForecast)
 		// add new city
