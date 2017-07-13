@@ -18,10 +18,12 @@ import (
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 // Zoli -->  add config  https://github.com/spf13/viper
 
+
+// Todo init uresnek a databaset, es amenniben mock meghivod ra populate mock data (Database.populateMockData)
 var Database []city_structs.CityInfo
 
 func SelectDatabase() []city_structs.CityInfo {
-
+	// todo csinald itt meg a structot
 	var mock = flag.String("mock", "", "placeholder")
 	flag.Parse()
 	if *mock == "true" {
