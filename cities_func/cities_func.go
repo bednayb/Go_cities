@@ -342,7 +342,7 @@ func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int
 			new_data_city_distance_time *= -1
 		}
 
-		if old_data_city_distance_time > new_data_city_distance_time {
+		if old_data_city_distance_time > new_data_city_distance_time || filtered_cities[v.City].Timestamp == 0{
 			cities_distance[v.City] = v
 		}
 	}
