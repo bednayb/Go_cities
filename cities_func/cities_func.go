@@ -155,25 +155,7 @@ func GetExpectedForecast(c *gin.Context) {
 	var filtered_cities = Nearest_city_data_in_time(Db_or_Mock, timestamp_int)
 
 	// count all distances
-	wg.Add(2)
-	var distances map[string]float64
-
-	city_half_1 := make(map[string]city_structs.CityInfo)
-	city_half_2 := make(map[string]city_structs.CityInfo)
-
-	cutter := 0
-	for key, val := range filtered_cities {
-		if cutter%2 == 0 {
-			city_half_1[key] = val
-		} else {
-			city_half_2[key] = val
-		}
-		cutter += 1
-	}
-
-	go Check_distance(present_data, city_half_1 ,&distances)
-	go Check_distance(present_data, city_half_2 ,&distances)
-	wg.Wait()
+	distances := CountDistance(present_data, filtered_cities)
 
 	// balanced the distances
 	var balance map[string]float64 = Balanced_distance(distances)
@@ -370,4 +352,27 @@ func merge_maps(x map[string]float64, y map[string]float64) map[string]float64 {
 		y[k] = v
 	}
 	return y
+}
+
+func CountDistance(currentPlaceAndTime city_structs.Cordinate_and_time, filteredCities map[string]city_structs.CityInfo) map[string]float64{
+	wg.Add(2)
+	var distances map[string]float64
+
+	city_half_1 := make(map[string]city_structs.CityInfo)
+	city_half_2 := make(map[string]city_structs.CityInfo)
+
+	cutter := 0
+	for key, val := range filteredCities {
+		if cutter%2 == 0 {
+			city_half_1[key] = val
+		} else {
+			city_half_2[key] = val
+		}
+		cutter += 1
+	}
+
+	go Check_distance(currentPlaceAndTime, city_half_1 ,&distances)
+	go Check_distance(currentPlaceAndTime, city_half_2 ,&distances)
+	wg.Wait()
+	return distances
 }
