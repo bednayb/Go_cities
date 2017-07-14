@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"fmt"
+
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
@@ -20,9 +22,10 @@ import (
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 
 type CitiesInfo []city_structs.CityInfo
-
+var mutex sync.Mutex
 var Db_or_Mock []city_structs.CityInfo
 var wg sync.WaitGroup
+var Counter = 0
 
 func Choose_db() []city_structs.CityInfo {
 
@@ -154,14 +157,19 @@ func GetExpectedForecast(c *gin.Context) {
 	// filter for the nearest data (by timestamp)
 	var filtered_cities = Nearest_city_data_in_time(Db_or_Mock, timestamp_int)
 
+	// channles
+	a:= Distance_counter(present_data, filtered_cities)
+	fmt.Println("I am distanceCounter",a)
+
+
 	// count all distances
-	distances := CountDistance(present_data, filtered_cities)
+	//distances := CountDistance(present_data, filtered_cities)
 
 	// balanced the distances
-	var balance map[string]float64 = Balanced_distance(distances)
-
+	var balance map[string]float64 = Balanced_distance(a)
 
 	// counting temps and raining data for next 5 days
+	// Todo csatornaval
 	wg.Add(2)
 	var forecast_rain []float64
 	var forecast_celsius []float64
@@ -355,6 +363,7 @@ func merge_maps(x map[string]float64, y map[string]float64) map[string]float64 {
 }
 
 func CountDistance(currentPlaceAndTime city_structs.Cordinate_and_time, filteredCities map[string]city_structs.CityInfo) map[string]float64{
+
 	wg.Add(2)
 	var distances map[string]float64
 
@@ -376,3 +385,92 @@ func CountDistance(currentPlaceAndTime city_structs.Cordinate_and_time, filtered
 	wg.Wait()
 	return distances
 }
+
+//Todo pointer helyett channeleket irj,
+//Todo 1. feldolgozo Process ( StartDatabaseWritingNode)
+//Todo 2. feldolgozando elemeket tartalmazo csatorna letrehozasa
+// Todo 3. response elemeket tartalmazo csatorna letrehozasa
+//Todo 4.   eleinditasz barmennyit
+// Todo 5. ciklus ami a valaszcsatornat dolgozza fel
+
+func Distance_counter(cordinate city_structs.Cordinate_and_time, filteredCities map[string]city_structs.CityInfo)(distanceCities map[string]float64) {
+
+	var databaseWait sync.WaitGroup
+
+	var names []string
+	for _,v := range filteredCities{
+		names = append(names,v.City)
+	}
+	fmt.Println(names)
+
+	//filtered_Cities := make(map[string]float64)
+	result_Cities := make(map[string]float64)
+
+	//channels
+	taskSavingChannel := make(chan map[string]float64)
+	responseChannel := make(chan map[string]float64)
+	//quit := make(chan int)
+
+	go Distance_counter_Process(10,  taskSavingChannel, cordinate, filteredCities, &databaseWait,responseChannel, names)
+	go Distance_counter_Process(20,  taskSavingChannel, cordinate, filteredCities, &databaseWait,responseChannel, names)
+	go Distance_counter_Process(30,  taskSavingChannel, cordinate, filteredCities, &databaseWait,responseChannel, names)
+
+
+	databaseWait.Add(1)
+	for _, v := range filteredCities {
+
+		y:= <- responseChannel
+
+		fmt.Println(v)
+
+		for k, v := range y {
+			result_Cities[k] = v
+		}
+	}
+
+	if len(result_Cities) == len(names){
+		databaseWait.Done()
+		fmt.Println("result",result_Cities)
+		//close(taskSavingChannel)
+		//close(responseChannel)
+	}
+	databaseWait.Wait()
+	//quit <- 0
+
+
+
+	return result_Cities
+
+}
+
+func Distance_counter_Process(proc_number int,a chan map[string]float64,cordinate city_structs.Cordinate_and_time,filteredCities map[string]city_structs.CityInfo, databaseWaitGroup *sync.WaitGroup, response chan map[string]float64, names[]string) {
+
+
+	var distance float64
+	result := make(map[string]float64)
+
+	for Counter < len(names) {
+
+		dis_lat := cordinate.Lat - filteredCities[names[Counter]].Geo.Lat
+		dis_lng := cordinate.Lng - filteredCities[names[Counter]].Geo.Lat
+
+		distance = math.Sqrt(math.Pow(dis_lat, 2) + math.Pow(dis_lng, 2))
+		result[filteredCities[names[Counter]].City] = distance
+		Counter += 1
+		response <- result
+		fmt.Println(proc_number)
+	}
+
+		//for {
+		//	select {
+		//	case response <- result:
+		//		fmt.Println(proc_number, "cities_distance", result)
+		//	case <-quit:
+		//		fmt.Println("quit")
+		//
+		//
+		//	}
+		//}
+
+}
+
