@@ -414,14 +414,17 @@ func Distance_counter(goroutine_numb int,cordinate city_structs.Cordinate_and_ti
 
 
 	for i:= 0; i < goroutine_numb; i++{
+
 		go Distance_counter_Process(i*10,  taskSavingChannel, cordinate, filteredCities, &databaseWait,responseChannel, names)
 	}
 
 	databaseWait.Add(1)
 	for _, v := range filteredCities {
-		kkk.Add(1)
-		y:= <- responseChannel
 
+		kkk.Add(1)
+		fmt.Println("*** eddig jut el ***")
+		y:= <- responseChannel
+		fmt.Println("*** eddig nem jut el ***")
 		fmt.Println(v)
 
 		for k, v := range y {
