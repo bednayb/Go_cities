@@ -25,6 +25,7 @@ type CitiesInfo []city_structs.CityInfo
 var mutex sync.Mutex
 var Db_or_Mock []city_structs.CityInfo
 var wg sync.WaitGroup
+var kkk sync.WaitGroup
 var Counter = 0
 
 func Choose_db() []city_structs.CityInfo {
@@ -158,7 +159,7 @@ func GetExpectedForecast(c *gin.Context) {
 	var filtered_cities = Nearest_city_data_in_time(Db_or_Mock, timestamp_int)
 
 	// channles
-	a:= Distance_counter(present_data, filtered_cities)
+	a:= Distance_counter(5,present_data, filtered_cities)
 	fmt.Println("I am distanceCounter",a)
 
 
@@ -393,7 +394,7 @@ func CountDistance(currentPlaceAndTime city_structs.Cordinate_and_time, filtered
 //Todo 4.   eleinditasz barmennyit
 // Todo 5. ciklus ami a valaszcsatornat dolgozza fel
 
-func Distance_counter(cordinate city_structs.Cordinate_and_time, filteredCities map[string]city_structs.CityInfo)(distanceCities map[string]float64) {
+func Distance_counter(goroutine_numb int,cordinate city_structs.Cordinate_and_time, filteredCities map[string]city_structs.CityInfo)(distanceCities map[string]float64) {
 
 	var databaseWait sync.WaitGroup
 
@@ -411,14 +412,14 @@ func Distance_counter(cordinate city_structs.Cordinate_and_time, filteredCities 
 	responseChannel := make(chan map[string]float64)
 	//quit := make(chan int)
 
-	go Distance_counter_Process(10,  taskSavingChannel, cordinate, filteredCities, &databaseWait,responseChannel, names)
-	go Distance_counter_Process(20,  taskSavingChannel, cordinate, filteredCities, &databaseWait,responseChannel, names)
-	go Distance_counter_Process(30,  taskSavingChannel, cordinate, filteredCities, &databaseWait,responseChannel, names)
 
+	for i:= 0; i < goroutine_numb; i++{
+		go Distance_counter_Process(i*10,  taskSavingChannel, cordinate, filteredCities, &databaseWait,responseChannel, names)
+	}
 
 	databaseWait.Add(1)
 	for _, v := range filteredCities {
-
+		kkk.Add(1)
 		y:= <- responseChannel
 
 		fmt.Println(v)
@@ -427,23 +428,19 @@ func Distance_counter(cordinate city_structs.Cordinate_and_time, filteredCities 
 			result_Cities[k] = v
 		}
 	}
-
+	kkk.Wait()
 	if len(result_Cities) == len(names){
 		databaseWait.Done()
 		fmt.Println("result",result_Cities)
-		//close(taskSavingChannel)
-		//close(responseChannel)
 	}
 	databaseWait.Wait()
 	//quit <- 0
-
-
 
 	return result_Cities
 
 }
 
-func Distance_counter_Process(proc_number int,a chan map[string]float64,cordinate city_structs.Cordinate_and_time,filteredCities map[string]city_structs.CityInfo, databaseWaitGroup *sync.WaitGroup, response chan map[string]float64, names[]string) {
+func Distance_counter_Process(proc_number int,a chan map[string]float64,cordinate city_structs.Cordinate_and_time,filteredCities map[string]city_structs.CityInfo, databaseWaitGroup *sync.WaitGroup, responseChannel chan map[string]float64, names[]string) {
 
 
 	var distance float64
@@ -457,17 +454,16 @@ func Distance_counter_Process(proc_number int,a chan map[string]float64,cordinat
 		distance = math.Sqrt(math.Pow(dis_lat, 2) + math.Pow(dis_lng, 2))
 		result[filteredCities[names[Counter]].City] = distance
 		Counter += 1
-		response <- result
+		responseChannel <- result
+		kkk.Done()
 		fmt.Println(proc_number)
+
 	}
 
 		//for {
 		//	select {
 		//	case response <- result:
 		//		fmt.Println(proc_number, "cities_distance", result)
-		//	case <-quit:
-		//		fmt.Println("quit")
-		//
 		//
 		//	}
 		//}
