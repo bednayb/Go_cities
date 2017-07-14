@@ -10,8 +10,8 @@ import (
 
 func main() {
 
-	// mock data  go run main.go -config mock
-	// test data  go run main.go -config mock (now mock and test data use same db)
+	// mock data  go run main.go -config development
+	// test_db data  go run main.go -config mock (now development and test_db data use same db)
 	// real data  go run main.go
 
 	var conf string

@@ -1,4 +1,4 @@
-package mock_data
+package mock_db
 
 import (
 	"github.com/bednayb/Go_cities/city_structs"
@@ -6,7 +6,7 @@ import (
 	//"time"
 )
 
-var All_Cities = []city_structs.CityInfo{
+var Cities = []city_structs.CityInfo{
 
 
 	city_structs.CityInfo{"paris", city_structs.Geo{100, 100}, [5]float64{40, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1000},

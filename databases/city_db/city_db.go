@@ -6,7 +6,7 @@ import (
 )
 
 
-var All_Cities = []city_structs.CityInfo{
+var Cities = []city_structs.CityInfo{
 
 }
 

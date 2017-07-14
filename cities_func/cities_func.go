@@ -2,22 +2,23 @@ package cities_func
 
 import (
 	"flag"
-	"github.com/bednayb/Go_cities/city_db"
+	"github.com/bednayb/Go_cities/databases/city_db"
 	"github.com/bednayb/Go_cities/city_structs"
-	"github.com/bednayb/Go_cities/mock_data"
+	"github.com/bednayb/Go_cities/databases/mock_db"
 	"github.com/gin-gonic/gin"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
+	"github.com/bednayb/Go_cities/databases/test_db"
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
-// TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (ready, test not works)
+// TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (ready, test_db not works)
 // TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? ez full kodos :))
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 // Zoli -->  add config  https://github.com/spf13/viper
-var City_Database []city_structs.CityInfo
+var City_Database CitiesInfo
 
 func ConfigSettings(config_file *string) {
 
@@ -34,11 +35,13 @@ func ConfigSettings(config_file *string) {
 
 func Init(conf string) {
 	if conf == "development" {
-		City_Database = mock_data.All_Cities
+		City_Database = mock_db.Cities
 	} else if conf == "test" {
-		City_Database = mock_data.All_Cities
-	} else {
-		City_Database = city_db.All_Cities
+		City_Database = test_db.Cities
+	} else if conf == "production"{
+		City_Database = city_db.Cities
+	}else{
+		City_Database = mock_db.Cities
 	}
 }
 
