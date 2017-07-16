@@ -2,12 +2,10 @@ package mockData
 
 import (
 	"github.com/bednayb/Go_cities/cityStructs"
-	//"time"
-	//"time"
 )
 
+// AllCities contains every city's data
 var AllCities = []cityStructs.CityInfo{
-
 
 	cityStructs.CityInfo{"paris", cityStructs.Geo{100, 100}, [5]float64{40, 5, 17, 5, 6}, [5]float64{0.2, 0.3, 0.4, 0.5, 0.6}, 1000},
 	cityStructs.CityInfo{"becs", cityStructs.Geo{90, 90}, [5]float64{40, 3, 17, 5, 6}, [5]float64{0.5, 0.3, 0.4, 0.5, 0.6}, 1500},

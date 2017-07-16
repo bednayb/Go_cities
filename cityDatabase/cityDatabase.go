@@ -5,7 +5,7 @@ import (
 
 )
 
-
+// AllCities contains every city's data
 var AllCities = []cityStructs.CityInfo{
 
 }

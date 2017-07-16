@@ -18,32 +18,34 @@ import (
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 // Zoli -->  add config  https://github.com/spf13/viper
 
+// CityDatabase is collection of cities
+var CityDatabase []cityStructs.CityInfo
 
-var Database []cityStructs.CityInfo
-
+// SelectDatabase where we choose our database
 func SelectDatabase() {
 
 	var mock = flag.String("mock", "", "placeholder")
 	flag.Parse()
 	if *mock == "true" {
-		Database = mockData.AllCities
+		CityDatabase = mockData.AllCities
 	} else {
-		Database = cityDatabase.AllCities
+		CityDatabase = cityDatabase.AllCities
 	}
 }
-
+// GetAllCity shows all cities
 func GetAllCity(c *gin.Context) {
-	cities := Database
+	cities := CityDatabase
 	c.JSON(200, cities)
 }
 
+// GetCityByName shows every data where the city name is same (example: becs)
 func GetCityByName(c *gin.Context) {
 
-	cities := Database
+	cities := CityDatabase
 	// find city's name from url
 	name := c.Params.ByName("name")
 	// bool for checking city is exist in our db
-	var redflag bool = true
+	redFlag :=true
 
 	// filtered cities order by timestamp (first the oldest)
 	var filteredCitiesByTime CitiesInfo
@@ -51,30 +53,50 @@ func GetCityByName(c *gin.Context) {
 	// filtering cities by name
 	for _, v := range cities {
 		if v.City == name {
-			redflag = false
+			redFlag = false
 			filteredCitiesByTime = append(filteredCitiesByTime, v)
 		}
 	}
-	if redflag {
+	if redFlag {
 		// response when city doesnt exist in our db
 		content := gin.H{"error": "city with name " + name + " not found"}
 		c.JSON(404, content)
 		return
-	} else {
+	}
 		// sorting cities
 		sort.Sort(filteredCitiesByTime)
 		// response when city exist in our db
 		c.JSON(200, gin.H{"filtered_cities_by_time": filteredCitiesByTime})
 		return
-	}
+
 	// TODO érdemes lenne mindkét if ágban egy return, hogy ide ne juthassunk el. (ready)
 	// Ha itt bármilyen kód lenne független attól hogy not found volt e lefutna!
 }
 
+// CitiesInfo is collection of cities
+type CitiesInfo []cityStructs.CityInfo
+
+// order Cities by Timestamp
+func (slice CitiesInfo) Len() int {
+	return len(slice)
+}
+
+func (slice CitiesInfo) Less(i, j int) bool {
+	return slice[i].Timestamp < slice[j].Timestamp
+}
+
+func (slice CitiesInfo) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
+
+
 // TODO ennek a fügvénynek a neve nem tükrözi hogy valójában mit csinál  (ready)
+
+//GetExpectedForecast where we count the expected raining change and celsius for next 5 days
 func GetExpectedForecast(c *gin.Context) {
 
-	if len(Database) == 0 {
+	if len(CityDatabase) == 0 {
 		content := gin.H{"response": "sry we havnt had enough data for calculating yet"}
 		c.JSON(200, content)
 		return
@@ -144,28 +166,27 @@ func GetExpectedForecast(c *gin.Context) {
 	// hiba esetén itt se menjünk tovább.
 
 	// data from the URL
-	var presentData = cityStructs.CoordinateAndTime{latitudeFloat64, longitudeFloat64, timestampInt}
+	presentData := cityStructs.CoordinateAndTime{latitudeFloat64, longitudeFloat64, timestampInt}
 
 	// filter for the nearest data (by timestamp)
-	var filteredCities = NearestCityDataInTime(Database, timestampInt)
+	filteredCities := NearestCityDataInTime(CityDatabase, timestampInt)
 
 	// count all distances
-	var distances map[string]float64 = CountDistance(presentData, filteredCities)
+	distances := CountDistance(presentData, filteredCities)
 
 	// balanced the distances
-
-	var balance map[string]float64 = BalanceDistance(distances)
+	balance := BalanceDistance(distances)
 
 	// count the forecast data
-
-	var forecastCelsius []float64 = CalculateTemps(balance, filteredCities)
-	var forecastRain []float64 = CalculateRain(balance, filteredCities)
+	forecastCelsius := CalculateTemps(balance, filteredCities)
+	forecastRain := CalculateRain(balance, filteredCities)
 
 	// send data
 	content := gin.H{"expected celsius next 5 days": forecastCelsius, "expected rainning chance next 5 days": forecastRain}
 	c.JSON(200, content)
 }
 
+// CountDistance where we count every city's distance from an exact place
 func CountDistance(coordinate cityStructs.CoordinateAndTime, info map[string]cityStructs.CityInfo) (cityDistance map[string]float64) {
 
 	// container for distance  key --> city name, value --> distance
@@ -184,7 +205,7 @@ func CountDistance(coordinate cityStructs.CoordinateAndTime, info map[string]cit
 	return citiesDistance
 }
 
-// linear interpolation (nearest 1 weight, furthest 0)
+// BalanceDistance ponderare by linear interpolation (nearest 1 weight, furthest 0)
 func BalanceDistance(distances map[string]float64) (balanceByDistance map[string]float64) {
 
 	//  balanced distance
@@ -192,7 +213,7 @@ func BalanceDistance(distances map[string]float64) (balanceByDistance map[string
 
 	//// find furthest (biggest number)
 	var permanentBiggest float64
-	var biggest float64 = 0
+	var biggest float64
 
 	for _, v := range distances {
 		if v > permanentBiggest {
@@ -201,8 +222,8 @@ func BalanceDistance(distances map[string]float64) (balanceByDistance map[string
 		}
 	}
 	//find nearest (smallest number)
-	var permanentSmallest float64 = biggest
-	var smallest float64 = biggest
+	 permanentSmallest := biggest
+	 smallest := biggest
 
 	for _, v := range distances {
 		if v < permanentSmallest {
@@ -213,7 +234,7 @@ func BalanceDistance(distances map[string]float64) (balanceByDistance map[string
 	// calculate balanced numbers
 	for i, v := range distances {
 		balanceNumber = (v - smallest) / (biggest - smallest)
-		balanceNumber -= 1
+		balanceNumber--
 		balanceNumber *= -1
 		// overwrite distance with balanced distance
 		distances[i] = balanceNumber
@@ -223,6 +244,8 @@ func BalanceDistance(distances map[string]float64) (balanceByDistance map[string
 }
 
 // todo refactor calculate_temps and calulate_rain to one function
+
+// CalculateTemps where we count the expected celsius for next five days
 func CalculateTemps(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo) (forecastCelsius []float64) {
 
 	var totalBalance float64
@@ -238,7 +261,7 @@ func CalculateTemps(balance map[string]float64, cityInfo map[string]cityStructs.
 			totalTemp += v.Temp[day] * balance[v.City]
 		}
 		// cut off 2 decimal
-		var untruncated float64 = totalTemp / totalBalance
+		untruncated := totalTemp / totalBalance
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
 		forecastCelsius = append(forecastCelsius, truncated)
@@ -246,6 +269,7 @@ func CalculateTemps(balance map[string]float64, cityInfo map[string]cityStructs.
 	return forecastCelsius
 }
 
+//CalculateRain where we count the expected raining chance for next five days
 func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo) (forecastRain []float64) {
 
 	var totalBalance float64
@@ -261,7 +285,7 @@ func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.C
 			totalCelsius += v.Rain[day] * balance[v.City]
 		}
 		// cut off 2 decimal
-		var untruncated float64 = totalCelsius / totalBalance
+		untruncated := totalCelsius / totalBalance
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
 		forecastRain = append(forecastRain, truncated)
@@ -271,20 +295,10 @@ func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.C
 
 // TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy (ready)
 // egyben látszódjon egy egy adattípusról, hogy mik az elemei és mik a rá definiált fugvények  (?)
-// order Cities by Timestamp
-func (slice CitiesInfo) Len() int {
-	return len(slice)
-}
 
-func (slice CitiesInfo) Less(i, j int) bool {
-	return slice[i].Timestamp < slice[j].Timestamp
-}
 
-func (slice CitiesInfo) Swap(i, j int) {
-	slice[i], slice[j] = slice[j], slice[i]
-}
 
-// saving new city
+// PostCity saving new city
 func PostCity(c *gin.Context) {
 
 	var json cityStructs.CityInfo
@@ -300,7 +314,7 @@ func PostCity(c *gin.Context) {
 		}
 	}
 
-	Database = append(Database, json)
+	CityDatabase = append(CityDatabase, json)
 
 	content := gin.H{
 		"result": "successful saving",
@@ -309,6 +323,8 @@ func PostCity(c *gin.Context) {
 }
 
 // TODO használjunk visszatérési érték változónevet is. (ready)
+
+// NearestCityDataInTime is a filter where we get back just one city (exm if we have 3 becs back just one) which is the most relevant by time
 func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (filteredCitiesReturnValue map[string]cityStructs.CityInfo) {
 	// TODO én MAP ez használnék ahol a város neve a kulcs  (ready)
 	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
@@ -335,4 +351,4 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 	return filteredCities
 }
 
-type CitiesInfo []cityStructs.CityInfo
+
