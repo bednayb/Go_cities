@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"fmt"
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
@@ -20,6 +21,7 @@ import (
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 
 type CitiesInfo []city_structs.CityInfo
+
 var mutex sync.Mutex
 var Db_or_Mock []city_structs.CityInfo
 var wg sync.WaitGroup
@@ -151,13 +153,13 @@ func GetExpectedForecast(c *gin.Context) {
 	// hiba esetén itt se menjünk tovább.
 
 	// data from the URL
-	var present_data = city_structs.Cordinate_and_time{lat_float64, lng_float64, timestamp_int}
+	var present_data = city_structs.CordinateAndTime{lat_float64, lng_float64, timestamp_int}
 
 	// filter for the nearest data (by timestamp)
 	var filtered_cities = Nearest_city_data_in_time(Db_or_Mock, timestamp_int)
 
 	// channles
-	a:= Distance_counter(present_data, filtered_cities)
+	a := DistanceCounter(15,present_data, filtered_cities)
 
 	// count all distances
 	//distances := CountDistance(present_data, filtered_cities)
@@ -170,8 +172,8 @@ func GetExpectedForecast(c *gin.Context) {
 	wg.Add(2)
 	var forecast_rain []float64
 	var forecast_celsius []float64
-	go Calculate_rain(balance,filtered_cities,&forecast_rain)
-	go Calculate_temp(balance,filtered_cities,&forecast_celsius)
+	go Calculate_rain(balance, filtered_cities, &forecast_rain)
+	go Calculate_temp(balance, filtered_cities, &forecast_celsius)
 	wg.Wait()
 
 	// send data
@@ -179,10 +181,10 @@ func GetExpectedForecast(c *gin.Context) {
 	c.JSON(200, content)
 }
 
-func Check_distance(cordinate city_structs.Cordinate_and_time, info map[string]city_structs.CityInfo, a *map[string]float64) {
+func Check_distance(cordinate city_structs.CordinateAndTime, info map[string]city_structs.CityInfo, a *map[string]float64) {
 
 	// container for distance  key --> city name, value --> distance
-	var cities_distance= make(map[string]float64)
+	var cities_distance = make(map[string]float64)
 
 	//count every distance of city (pitágoras)
 	var distance float64
@@ -195,10 +197,9 @@ func Check_distance(cordinate city_structs.Cordinate_and_time, info map[string]c
 		cities_distance[info.City] = distance
 	}
 
-	*a = merge_maps(*a,cities_distance)
+	*a = merge_maps(*a, cities_distance)
 	wg.Done()
 }
-
 
 // linear interpolation (nearest 1 weight, furthest 0)
 func Balanced_distance(distances map[string]float64) (balance_by_distance map[string]float64) {
@@ -238,7 +239,7 @@ func Balanced_distance(distances map[string]float64) (balance_by_distance map[st
 	return distances
 }
 
-func Calculate_rain(balance map[string]float64, city_info map[string]city_structs.CityInfo,a *[]float64) {
+func Calculate_rain(balance map[string]float64, city_info map[string]city_structs.CityInfo, a *[]float64) {
 
 	var total_balance float64
 	var total_temp float64
@@ -256,13 +257,13 @@ func Calculate_rain(balance map[string]float64, city_info map[string]city_struct
 		var untruncated float64 = total_temp / total_balance
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
-		*a = append(*a,truncated)
+		*a = append(*a, truncated)
 	}
 	wg.Done()
 
 }
 
-func Calculate_temp(balance map[string]float64, city_info map[string]city_structs.CityInfo,a *[]float64) {
+func Calculate_temp(balance map[string]float64, city_info map[string]city_structs.CityInfo, a *[]float64) {
 
 	var total_balance float64
 	var total_temp float64
@@ -280,7 +281,7 @@ func Calculate_temp(balance map[string]float64, city_info map[string]city_struct
 		var untruncated float64 = total_temp / total_balance
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
-		*a = append(*a,truncated)
+		*a = append(*a, truncated)
 
 	}
 	wg.Done()
@@ -344,7 +345,7 @@ func Nearest_city_data_in_time(all_cities []city_structs.CityInfo, timestamp int
 			new_data_city_distance_time *= -1
 		}
 
-		if old_data_city_distance_time > new_data_city_distance_time || filtered_cities[v.City].Timestamp == 0{
+		if old_data_city_distance_time > new_data_city_distance_time || filtered_cities[v.City].Timestamp == 0 {
 			cities_distance[v.City] = v
 		}
 	}
@@ -359,7 +360,7 @@ func merge_maps(x map[string]float64, y map[string]float64) map[string]float64 {
 	return y
 }
 
-func CountDistance(currentPlaceAndTime city_structs.Cordinate_and_time, filteredCities map[string]city_structs.CityInfo) map[string]float64{
+func CountDistance(currentPlaceAndTime city_structs.CordinateAndTime, filteredCities map[string]city_structs.CityInfo) map[string]float64 {
 
 	wg.Add(2)
 	var distances map[string]float64
@@ -377,8 +378,8 @@ func CountDistance(currentPlaceAndTime city_structs.Cordinate_and_time, filtered
 		cutter += 1
 	}
 
-	go Check_distance(currentPlaceAndTime, city_half_1 ,&distances)
-	go Check_distance(currentPlaceAndTime, city_half_2 ,&distances)
+	go Check_distance(currentPlaceAndTime, city_half_1, &distances)
+	go Check_distance(currentPlaceAndTime, city_half_2, &distances)
 	wg.Wait()
 	return distances
 }
@@ -390,40 +391,39 @@ func CountDistance(currentPlaceAndTime city_structs.Cordinate_and_time, filtered
 //Todo 4.   eleinditasz barmennyit
 // Todo 5. ciklus ami a valaszcsatornat dolgozza fel
 
-func Distance_counter(cordinate city_structs.Cordinate_and_time, filteredCities map[string]city_structs.CityInfo)(distanceCities map[string]float64) {
+func DistanceCounter(procNumber int,cordinate city_structs.CordinateAndTime, filteredCities map[string]city_structs.CityInfo) (distanceCities map[string]float64) {
 
 	var wg sync.WaitGroup
 
-	result := make( map[string]float64)
+	result := make(map[string]float64)
 	var names []string
-	for _,v := range filteredCities{
-		names = append(names,v.City)
+	for _, v := range filteredCities {
+		names = append(names, v.City)
 	}
 
 	//channels
 	in := make(chan chan map[string]float64)
 
-	go Distance_counter_Process(in, cordinate, filteredCities, names)
-	go Distance_counter_Process(in, cordinate, filteredCities, names)
-	go Distance_counter_Process(in, cordinate, filteredCities, names)
-	go Distance_counter_Process(in, cordinate, filteredCities, names)
-	go Distance_counter_Process(in, cordinate, filteredCities, names)
+	//make processor
+	for i:=0; i < procNumber;i++ {
+		go DistanceCounterProcess(in, cordinate, filteredCities, names, i*10)
+	}
 
-	// Five clients with some tasks
+	// Send data until left
 	for n := 0; n < len(filteredCities); n++ {
-		mutex.Lock()
 
+		mutex.Lock()
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			c := make(chan map[string]float64)
 			in <- c
-			z:= <-c
+			z := <-c
 
 			for k, v := range z {
 				result[k] = v
 			}
-		mutex.Unlock()
+			mutex.Unlock()
 		}()
 	}
 
@@ -433,13 +433,13 @@ func Distance_counter(cordinate city_structs.Cordinate_and_time, filteredCities 
 
 }
 
-func Distance_counter_Process(in chan chan map[string]float64,cordinate city_structs.Cordinate_and_time,filteredCities map[string]city_structs.CityInfo,  names[]string) {
+func DistanceCounterProcess(in chan chan map[string]float64, cordinate city_structs.CordinateAndTime, filteredCities map[string]city_structs.CityInfo, names []string, procNum int) {
 
 
 	var distance float64
 	result := make(map[string]float64)
 
-	for in:= range in {
+	for in := range in {
 
 		dis_lat := cordinate.Lat - filteredCities[names[Counter]].Geo.Lat
 		dis_lng := cordinate.Lng - filteredCities[names[Counter]].Geo.Lat
