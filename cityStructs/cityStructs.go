@@ -1,4 +1,4 @@
-package city_structs
+package cityStructs
 // TODO gorm? nem szükséges egyelőre sehová, ezeket tisztítsuk ki (ready)
 // TODO form ot használjuk valamire? (ready)
 // ebből a sorból töröltem a, amit már végrehajtottál
@@ -13,7 +13,7 @@ type CityInfo struct {
 
 type CitiesInfo []CityInfo
 
-type Cordinate_and_time struct {
+type CoordinateAndTime struct {
 	Lat       float64 `json:"Lat"`
 	Lng       float64 `json:"Lng"`
 	Timestamp int64   `json:"Timestamp"`
