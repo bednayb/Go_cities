@@ -14,11 +14,11 @@ func main() {
 	// if you want to use test data  run go run main.go -config test
 	// if you want to use production data  run go run main.go -config production
 
-	var conf string
-	citiesFunction.ConfigSettings(&conf)
+	var configFile string
+	citiesFunction.ConfigSettings(&configFile)
 
 	//Set config file path including file name and extension
-	viper.SetConfigFile("./config/"+conf+".json")
+	viper.SetConfigFile("./config/"+ configFile +".json")
 
 	// Find and read the config file
 	if err := viper.ReadInConfig(); err != nil {
@@ -28,12 +28,12 @@ func main() {
 	// Confirm which config file is used
 	fmt.Printf("Using config: %s\n", viper.ConfigFileUsed())
 
-	if !viper.IsSet(conf+".database") {
+	if !viper.IsSet(configFile +".database") {
 		log.Fatal("missing database")
 	}
 
 	//Settings data
-	citiesFunction.Init(conf)
+	citiesFunction.Init(configFile)
 
 	r := gin.Default()
 	v1 := r.Group("/")
