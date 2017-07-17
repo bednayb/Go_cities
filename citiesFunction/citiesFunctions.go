@@ -2,16 +2,16 @@ package citiesFunction
 
 import (
 	"flag"
+	"github.com/bednayb/Go_cities/cityStructs"
+	"github.com/bednayb/Go_cities/databases/mockDatabase"
+	"github.com/bednayb/Go_cities/databases/productionDatabase"
+	"github.com/bednayb/Go_cities/databases/testDatabase"
 	"github.com/gin-gonic/gin"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"github.com/bednayb/Go_cities/cityStructs"
-	"github.com/bednayb/Go_cities/databases/mockDatabase"
-	"github.com/bednayb/Go_cities/databases/productionDatabase"
-	"github.com/bednayb/Go_cities/databases/testDatabase"
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
@@ -20,6 +20,7 @@ import (
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 
 type CitiesInfo []cityStructs.CityInfo
+
 var mutex sync.Mutex
 var CityDatabase []cityStructs.CityInfo
 var wg sync.WaitGroup
@@ -43,9 +44,9 @@ func Init(conf string) {
 		CityDatabase = mockDatabase.Cities
 	} else if conf == "test" {
 		CityDatabase = testDatabase.Cities
-	} else if conf == "production"{
+	} else if conf == "production" {
 		CityDatabase = productionDatabase.Cities
-	}else{
+	} else {
 		CityDatabase = mockDatabase.Cities
 	}
 }
@@ -240,7 +241,7 @@ func BalancedDistance(distances map[string]float64) (balanceByDistance map[strin
 	// calculate balanced numbers
 	for i, v := range distances {
 		balanceNumber = (v - smallest) / (biggest - smallest)
-		balanceNumber --
+		balanceNumber--
 		balanceNumber *= -1
 		// overwrite distance with balanced distance
 		distances[i] = balanceNumber
@@ -401,8 +402,7 @@ func mergeMaps(x map[string]float64, y map[string]float64) map[string]float64 {
 //Todo 4.   eleinditasz barmennyit
 // Todo 5. ciklus ami a valaszcsatornat dolgozza fel
 
-
-func DistanceCounter(procNumber int,cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
+func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
 
 	var wg sync.WaitGroup
 
@@ -416,8 +416,8 @@ func DistanceCounter(procNumber int,cordinate cityStructs.CoordinateAndTime, fil
 	in := make(chan chan map[string]float64)
 
 	//make processor
-	for i:=0; i < procNumber;i++ {
-		go DistanceCounterProcess(in, cordinate, filteredCities, names, i*10)
+	for i := 0; i < procNumber; i++ {
+		go DistanceCounterProcess(in, cordinate, filteredCities, names)
 	}
 
 	// Send data until left
@@ -444,7 +444,7 @@ func DistanceCounter(procNumber int,cordinate cityStructs.CoordinateAndTime, fil
 
 }
 
-func DistanceCounterProcess(in chan chan map[string]float64, cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo, names []string, procNum int) {
+func DistanceCounterProcess(in chan chan map[string]float64, cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo, names []string) {
 
 	var distance float64
 	result := make(map[string]float64)
@@ -456,7 +456,7 @@ func DistanceCounterProcess(in chan chan map[string]float64, cordinate cityStruc
 
 		distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
 		result[filteredCities[names[Counter]].City] = distance
-		Counter ++
+		Counter++
 		in <- result
 
 	}
