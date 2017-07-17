@@ -29,9 +29,10 @@ var CityDatabase CitiesInfo
 var mutex sync.Mutex
 var wg sync.WaitGroup
 
+// Counter change the city's name at DistanceCounterProcess
 var Counter = 0
 
-//ConfigSettings here you can choose whice settings file will be used
+//ConfigSettings here you can choose which settings file will be used
 func ConfigSettings(configFile *string) {
 
 	var config = flag.String("config", "", "placeholder")
@@ -45,6 +46,7 @@ func ConfigSettings(configFile *string) {
 	}
 }
 
+//Init settings the config file;s contents
 func Init(conf string) {
 	if conf == "development" {
 		for i:=0; i < len(mockDatabase.Cities);i++ {
@@ -107,6 +109,8 @@ func GetCityByName(c *gin.Context) {
 }
 
 // TODO ennek a fügvénynek a neve nem tükrözi hogy valójában mit csinál  (ready)
+
+//GetExpectedForecast count the expected celsius and raining change for next five days
 func GetExpectedForecast(c *gin.Context) {
 
 	if len(CityDatabase) == 0 {
@@ -227,7 +231,7 @@ func GetExpectedForecast(c *gin.Context) {
 //	wg.Done()
 //}
 
-// BalanceDistance ponderare by linear interpolation (nearest 1 weight, furthest 0)
+// BalancedDistanceByLinearInterpolation ponderare by linear interpolation (nearest 1 weight, furthest 0)
 func BalancedDistanceByLinearInterpolation(distances map[string]float64) (balanceByDistance map[string]float64) {
 
 	//  balanced distance
@@ -288,7 +292,7 @@ func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.C
 	wg.Done()
 
 }
-// BalanceDistance ponderare by linear interpolation (nearest 1 weight, furthest 0)
+//CalculateTemp where we count the expected Celsius chance for next five days
 func CalculateTemp(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo, a *[]float64) {
 
 	var totalBalance float64
@@ -328,7 +332,7 @@ func (slice CitiesInfo) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-// saving new city
+// PostCity saving new city
 func PostCity(c *gin.Context) {
 
 	var json cityStructs.CityInfo
@@ -466,7 +470,7 @@ func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, fi
 	return result
 
 }
-
+//DistanceCounterProcess count the distances of city and send back to DistanceCounter
 func DistanceCounterProcess(in chan chan map[string]float64, cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo, names []string) {
 
 	var distance float64
