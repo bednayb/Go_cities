@@ -4,7 +4,6 @@ import (
 	"flag"
 	"github.com/bednayb/Go_cities/cityStructs"
 	"github.com/bednayb/Go_cities/databases/mockDatabase"
-	"github.com/bednayb/Go_cities/databases/productionDatabase"
 	"github.com/bednayb/Go_cities/databases/testDatabase"
 	"github.com/gin-gonic/gin"
 	"math"
@@ -12,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"github.com/bednayb/Go_cities/databases/productionDatabase"
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
@@ -22,8 +22,10 @@ import (
 
 // CitiesInfo is collection of cities
 type CitiesInfo []cityStructs.CityInfo
+
 // CityDatabase is collection of cities
 var CityDatabase CitiesInfo
+
 var mutex sync.Mutex
 
 var wg sync.WaitGroup
@@ -35,26 +37,33 @@ func ConfigSettings(configFile *string) {
 
 	var config = flag.String("config", "", "placeholder")
 	flag.Parse()
-	if *config == "development" {
-		*configFile = "development"
+	if *config == "production" {
+		*configFile = "production"
 	} else if *config == "test" {
 		*configFile = "test"
 	} else {
-		*configFile = "production"
+		*configFile = "development"
 	}
 }
 
 func Init(conf string) {
 	if conf == "development" {
-		CityDatabase = mockDatabase.Cities
+		for i:=0; i < len(mockDatabase.Cities);i++ {
+			CityDatabase = append(CityDatabase, mockDatabase.Cities[i])
+		}
 	} else if conf == "test" {
-		CityDatabase = testDatabase.Cities
+		for i := 0; i < len(testDatabase.Cities); i++ {
+			CityDatabase = append(CityDatabase, testDatabase.Cities[i])
+		}
 	} else if conf == "production" {
-		CityDatabase = productionDatabase.Cities
-	} else {
-		CityDatabase = mockDatabase.Cities
+		for i := 0; i < len(productionDatabase.Cities); i++ {
+			CityDatabase = append(CityDatabase, productionDatabase.Cities[i])
+		}
 	}
 }
+
+
+
 
 // GetAllCity shows all cities
 func GetAllCity(c *gin.Context) {
