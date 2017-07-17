@@ -47,6 +47,7 @@ func ConfigSettings(configFile *string) {
 	}
 }
 
+// Init before run the program settings config contents
 func Init(conf string) {
 	switch conf {
 	case "development":
