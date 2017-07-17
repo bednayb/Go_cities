@@ -4,6 +4,7 @@ import (
 	"flag"
 	"github.com/bednayb/Go_cities/cityStructs"
 	"github.com/bednayb/Go_cities/databases/mockDatabase"
+	"github.com/bednayb/Go_cities/databases/productionDatabase"
 	"github.com/bednayb/Go_cities/databases/testDatabase"
 	"github.com/gin-gonic/gin"
 	"math"
@@ -11,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"github.com/bednayb/Go_cities/databases/productionDatabase"
+	"fmt"
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
@@ -19,16 +20,13 @@ import (
 // TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? ez full kodos :))
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 
-
 // CitiesInfo is collection of cities
 type CitiesInfo []cityStructs.CityInfo
 
 // CityDatabase is collection of cities
 var CityDatabase CitiesInfo
 
-var mutex sync.Mutex
-var wg sync.WaitGroup
-
+var mutex = &sync.Mutex{}
 // Counter change the city's name at DistanceCounterProcess
 var Counter = 0
 
@@ -37,7 +35,7 @@ func ConfigSettings(configFile *string) {
 
 	var config = flag.String("config", "", "placeholder")
 	flag.Parse()
-	switch *config{
+	switch *config {
 	case "production":
 		*configFile = "production"
 	case "test":
@@ -50,17 +48,17 @@ func ConfigSettings(configFile *string) {
 // Init before run the program settings config contents
 func Init(conf string) {
 	switch conf {
-	case "development":
-		for i := 0; i < len(mockDatabase.Cities); i++ {
-			CityDatabase = append(CityDatabase, mockDatabase.Cities[i])
+	case "production":
+		for i := 0; i < len(productionDatabase.Cities); i++ {
+			CityDatabase = append(CityDatabase, productionDatabase.Cities[i])
 		}
 	case "test":
 		for i := 0; i < len(testDatabase.Cities); i++ {
 			CityDatabase = append(CityDatabase, testDatabase.Cities[i])
 		}
 	default:
-		for i := 0; i < len(productionDatabase.Cities); i++ {
-			CityDatabase = append(CityDatabase, productionDatabase.Cities[i])
+		for i := 0; i < len(mockDatabase.Cities); i++ {
+			CityDatabase = append(CityDatabase, mockDatabase.Cities[i])
 		}
 	}
 }
@@ -111,7 +109,7 @@ func GetCityByName(c *gin.Context) {
 
 //GetExpectedForecast count the expected celsius and raining change for next five days
 func GetExpectedForecast(c *gin.Context) {
-
+	var wg sync.WaitGroup
 	if len(CityDatabase) == 0 {
 		content := gin.H{"response": "sry we havnt had enough data for calculating yet"}
 		c.JSON(200, content)
@@ -188,21 +186,20 @@ func GetExpectedForecast(c *gin.Context) {
 	filteredCitiesbyTime := NearestCityDataInTime(CityDatabase, timestampConvertToInt)
 
 	// count all distance with channels
-	citiesDistance := DistanceCounter(15, presentData, filteredCitiesbyTime)
+	citiesDistance := DistanceCounter( presentData, filteredCitiesbyTime)
 
 	// count all distances
 	//distances := CountDistance(presentData, filteredCitiesbyTime)
 
 	// balanced the distances
 	balancedDistance := BalancedDistanceByLinearInterpolation(citiesDistance)
-
 	// counting temps and raining data for next 5 days
 	// Todo csatornaval
 	wg.Add(2)
 	var forecastRain []float64
 	var forecastCelsius []float64
-	go CalculateRain(balancedDistance, filteredCitiesbyTime, &forecastRain)
-	go CalculateTemp(balancedDistance, filteredCitiesbyTime, &forecastCelsius)
+	go CalculateRain(balancedDistance, filteredCitiesbyTime, &forecastRain, &wg)
+	go CalculateTemp(balancedDistance, filteredCitiesbyTime, &forecastCelsius, &wg)
 	wg.Wait()
 
 	// send data
@@ -267,8 +264,9 @@ func BalancedDistanceByLinearInterpolation(distances map[string]float64) (balanc
 
 	return distances
 }
+
 //CalculateRain where we count the expected raining chance for next five days
-func CalculateRain(balancedCityDistance map[string]float64, cityInfo map[string]cityStructs.CityInfo, ForecastRainingChance *[]float64) {
+func CalculateRain(balancedCityDistance map[string]float64, cityInfo map[string]cityStructs.CityInfo, ForecastRainingChance *[]float64, databaseWaitGroup *sync.WaitGroup) {
 
 	var totalBalance float64
 	var totalTemp float64
@@ -288,11 +286,12 @@ func CalculateRain(balancedCityDistance map[string]float64, cityInfo map[string]
 		// put data to container
 		*ForecastRainingChance = append(*ForecastRainingChance, truncated)
 	}
-	wg.Done()
+	databaseWaitGroup.Done()
 
 }
+
 //CalculateTemp where we count the expected Celsius chance for next five days
-func CalculateTemp(balancedCityDistance map[string]float64, cityInfo map[string]cityStructs.CityInfo, ForecastTemps *[]float64) {
+func CalculateTemp(balancedCityDistance map[string]float64, cityInfo map[string]cityStructs.CityInfo, ForecastTemps *[]float64,databaseWaitGroup *sync.WaitGroup) {
 
 	var totalBalance float64
 	var totalTemp float64
@@ -313,7 +312,7 @@ func CalculateTemp(balancedCityDistance map[string]float64, cityInfo map[string]
 		*ForecastTemps = append(*ForecastTemps, truncated)
 
 	}
-	wg.Done()
+	databaseWaitGroup.Done()
 }
 
 // TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy (ready)
@@ -423,12 +422,13 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 // Todo 5. ciklus ami a valaszcsatornat dolgozza fel
 
 // DistanceCounter where we count every city's distance from an exact place
-func DistanceCounter(procNumber int, coordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
+func DistanceCounter(coordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
 
 	var wg sync.WaitGroup
 
 	// because of the append we need to declare here by make
 	result := make(map[string]float64)
+
 
 	// contains every filtered city's name
 	var names []string
@@ -437,57 +437,66 @@ func DistanceCounter(procNumber int, coordinate cityStructs.CoordinateAndTime, f
 	}
 
 	//make channel
-	in := make(chan chan map[string]float64)
-
+	in := make(chan cityStructs.CityInfo,5)
+	out := make(chan map[string]float64,5)
 	//make processor
-	for i := 0; i < procNumber; i++ {
-		go DistanceCounterProcess(in, coordinate, filteredCities, names)
-	}
+
+		go DistanceCounterProcess(in, coordinate, out, &wg)
+	    go DistanceCounterProcess(in, coordinate, out, &wg)
 
 	// Send data until left
-	for n := 0; n < len(filteredCities); n++ {
+	for _, cityInfo := range filteredCities {
 
-		mutex.Lock()
 		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			c := make(chan map[string]float64)
-			in <- c
-			z := <-c
 
-			// merge maps
-			for k, v := range z {
-				result[k] = v
-			}
-			mutex.Unlock()
-		}()
+		in <- cityInfo
 	}
+		go func() {
+			for {
+				select {
+
+				case res := <-out:
+
+					//result = append(result, res)
+
+					for k, v := range res {
+						result[k] = v
+					}
+
+					wg.Done()
+
+				}
+			}
+		}()
 
 	wg.Wait()
-	// its necceseary to Counter equal to 0, because we can have more query and can be out of range
-	Counter = 0
+	fmt.Println("i am the result",result, len(result))
 	return result
 
 }
 //DistanceCounterProcess count the distances of city and send back to DistanceCounter
-func DistanceCounterProcess(in chan chan map[string]float64, coordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo, names []string) {
+func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs.CoordinateAndTime, out chan map[string]float64, wg *sync.WaitGroup) {
+
 
 	var distance float64
 	CityNameWithDistance := make(map[string]float64)
 
-	for in := range in {
-
+	for {
+		select {
+			case cityInfo := <-in:
+				defer wg.Done()
 		// count distance
-		latitudeDistance := coordinate.Lat - filteredCities[names[Counter]].Geo.Lat
-		longitudeDistance := coordinate.Lng - filteredCities[names[Counter]].Geo.Lat
+		latitudeDistance := coordinate.Lat - cityInfo.Geo.Lat
+		longitudeDistance := coordinate.Lng - cityInfo.Geo.Lat
 		distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
 
 		// add distance to city's name
-		CityNameWithDistance[filteredCities[names[Counter]].City] = distance
+		CityNameWithDistance[cityInfo.City] = distance
 		// increase Counter (for changing new city's name)
-		Counter++
+
 		//send back
-		in <- CityNameWithDistance
+		out <- CityNameWithDistance
 
 	}
+}
 }
