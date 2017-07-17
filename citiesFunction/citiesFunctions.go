@@ -2,52 +2,66 @@ package citiesFunction
 
 import (
 	"flag"
-	"github.com/bednayb/Go_cities/cityDatabase"
-	"github.com/bednayb/Go_cities/cityStructs"
-	"github.com/bednayb/Go_cities/mockData"
 	"github.com/gin-gonic/gin"
 	"math"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"github.com/bednayb/Go_cities/cityStructs"
+	"github.com/bednayb/Go_cities/databases/mockDatabase"
+	"github.com/bednayb/Go_cities/databases/productionDatabase"
+	"github.com/bednayb/Go_cities/databases/testDatabase"
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
 // TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (ready, test not works)
-// TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? add_config_file_branch))
+// TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? ez full kodos :))
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
-// Zoli -->  add config  https://github.com/spf13/viper
 
-
-// CityDatabase is collection of cities
+type CitiesInfo []cityStructs.CityInfo
+var mutex sync.Mutex
 var CityDatabase []cityStructs.CityInfo
+var wg sync.WaitGroup
+var Counter = 0
 
-// SelectDatabase where we choose our database
-func SelectDatabase() {
+func ConfigSettings(configFile *string) {
 
-
-	var mock = flag.String("mock", "", "placeholder")
+	var config = flag.String("config", "", "placeholder")
 	flag.Parse()
-	if *mock == "true" {
-		CityDatabase = mockData.AllCities
+	if *config == "development" {
+		*configFile = "development"
+	} else if *config == "test" {
+		*configFile = "test"
 	} else {
-		CityDatabase = cityDatabase.AllCities
+		*configFile = "production"
 	}
 }
-// GetAllCity shows all cities
+
+func Init(conf string) {
+	if conf == "development" {
+		CityDatabase = mockDatabase.Cities
+	} else if conf == "test" {
+		CityDatabase = testDatabase.Cities
+	} else if conf == "production"{
+		CityDatabase = productionDatabase.Cities
+	}else{
+		CityDatabase = mockDatabase.Cities
+	}
+}
+
 func GetAllCity(c *gin.Context) {
 	cities := CityDatabase
 	c.JSON(200, cities)
 }
 
-// GetCityByName shows every data where the city name is same (example: becs)
 func GetCityByName(c *gin.Context) {
 
 	cities := CityDatabase
 	// find city's name from url
 	name := c.Params.ByName("name")
 	// bool for checking city is exist in our db
-	redFlag :=true
+	redFlag := true
 
 	// filtered cities order by timestamp (first the oldest)
 	var filteredCitiesByTime CitiesInfo
@@ -65,37 +79,18 @@ func GetCityByName(c *gin.Context) {
 		c.JSON(404, content)
 		return
 	}
-		// sorting cities
-		sort.Sort(filteredCitiesByTime)
-		// response when city exist in our db
-		c.JSON(200, gin.H{"filtered_cities_by_time": filteredCitiesByTime})
-		return
+
+	// sorting cities
+	sort.Sort(filteredCitiesByTime)
+	// response when city exist in our db
+	c.JSON(200, gin.H{"filteredCitiesByTime": filteredCitiesByTime})
+	return
 
 	// TODO érdemes lenne mindkét if ágban egy return, hogy ide ne juthassunk el. (ready)
 	// Ha itt bármilyen kód lenne független attól hogy not found volt e lefutna!
 }
 
-// CitiesInfo is collection of cities
-type CitiesInfo []cityStructs.CityInfo
-
-// order Cities by Timestamp
-func (slice CitiesInfo) Len() int {
-	return len(slice)
-}
-
-func (slice CitiesInfo) Less(i, j int) bool {
-	return slice[i].Timestamp < slice[j].Timestamp
-}
-
-func (slice CitiesInfo) Swap(i, j int) {
-	slice[i], slice[j] = slice[j], slice[i]
-}
-
-
-
 // TODO ennek a fügvénynek a neve nem tükrözi hogy valójában mit csinál  (ready)
-
-//GetExpectedForecast where we count the expected raining change and celsius for next 5 days
 func GetExpectedForecast(c *gin.Context) {
 
 	if len(CityDatabase) == 0 {
@@ -130,31 +125,31 @@ func GetExpectedForecast(c *gin.Context) {
 	}
 
 	//Convert to float64/int
-	var convertProblemMessage string
-	latitudeFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
+	var convertProblem string
+	latitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
 
-	if lat != "0" && latitudeFloat64 == 0 {
-		convertProblemMessage += "invalid lat data (not number), "
+	if lat != "0" && latitudeConvertToFloat64 == 0 {
+		convertProblem += "invalid lat data (not number), "
 	}
 
-	longitudeFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
-	if lat != "0" && longitudeFloat64 == 0 {
-		convertProblemMessage += "invalid lng data (not number), "
+	longitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
+	if lat != "0" && longitudeConvertToFloat64 == 0 {
+		convertProblem += "invalid lng data (not number), "
 	}
 
-	timestampInt, _ := strconv.ParseInt(timestamp, 10, 64)
-	if lat != "0" && timestampInt == 0 {
-		convertProblemMessage += "invalid timestamp data (not number) "
+	timestampConvertToInt, _ := strconv.ParseInt(timestamp, 10, 64)
+	if lat != "0" && timestampConvertToInt == 0 {
+		convertProblem += "invalid timestamp data (not number) "
 	}
 
-	if len(convertProblemMessage) > 0 {
-		content := gin.H{"error_message ": convertProblemMessage}
+	if len(convertProblem) > 0 {
+		content := gin.H{"error_message ": convertProblem}
 		c.JSON(400, content)
 		// TODO itt érdemes lenne egy return, hogy ne folytassuk a futást ha hiba volt  (ready)
 		return
 	}
 
-	if timestampInt < 0 {
+	if timestampConvertToInt < 0 {
 		content := gin.H{"error_message ": "timestamp should be bigger than 0"}
 		c.JSON(400, content)
 		// TODO itt érdemes lenne egy return, hogy ne folytassuk a futást ha hiba volt  (ready)
@@ -168,47 +163,56 @@ func GetExpectedForecast(c *gin.Context) {
 	// hiba esetén itt se menjünk tovább.
 
 	// data from the URL
-	presentData := cityStructs.CoordinateAndTime{latitudeFloat64, longitudeFloat64, timestampInt}
+	presentData := cityStructs.CoordinateAndTime{latitudeConvertToFloat64, longitudeConvertToFloat64, timestampConvertToInt}
 
 	// filter for the nearest data (by timestamp)
-	filteredCities := NearestCityDataInTime(CityDatabase, timestampInt)
+	filteredCities := NearestCityDataInTime(CityDatabase, timestampConvertToInt)
+
+	// count all distance with channels
+	a := DistanceCounter(15, presentData, filteredCities)
 
 	// count all distances
-	distances := CountDistance(presentData, filteredCities)
+	//distances := CountDistance(presentData, filteredCities)
 
 	// balanced the distances
-	balance := BalanceDistance(distances)
+	balance := BalancedDistance(a)
 
-	// count the forecast data
-	forecastCelsius := CalculateTemps(balance, filteredCities)
-	forecastRain := CalculateRain(balance, filteredCities)
+	// counting temps and raining data for next 5 days
+	// Todo csatornaval
+	wg.Add(2)
+	var forecastRain []float64
+	var forecastCelsius []float64
+	go CalculateRain(balance, filteredCities, &forecastRain)
+	go CalculateTemp(balance, filteredCities, &forecastCelsius)
+	wg.Wait()
 
 	// send data
 	content := gin.H{"expected celsius next 5 days": forecastCelsius, "expected rainning chance next 5 days": forecastRain}
 	c.JSON(200, content)
 }
 
-// CountDistance where we count every city's distance from an exact place
-func CountDistance(coordinate cityStructs.CoordinateAndTime, info map[string]cityStructs.CityInfo) (cityDistance map[string]float64) {
+//func CountCitiesDistance(coordinate cityStructs.CoordinateAndTime, info map[string]cityStructs.CityInfo, a *map[string]float64) {
+//
+//	// container for distance  key --> city name, value --> distance
+//	var citiesDistance = make(map[string]float64)
+//
+//	//count every distance of city (pitágoras)
+//	var distance float64
+//	for _, info := range info {
+//
+//		latitudeDistance := coordinate.Lat - info.Geo.Lat
+//		longitudeDistance := coordinate.Lng - info.Geo.Lng
+//
+//		distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
+//		citiesDistance[info.City] = distance
+//	}
+//
+//	*a = mergeMaps(*a, citiesDistance)
+//	wg.Done()
+//}
 
-	// container for distance  key --> city name, value --> distance
-	var citiesDistance = make(map[string]float64)
-
-	//count every distance of city (pitágoras)
-	var distance float64
-	for _, info := range info {
-
-		latitudeDistance := coordinate.Lat - info.Geo.Lat
-		longitudeDistance := coordinate.Lng - info.Geo.Lng
-
-		distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
-		citiesDistance[info.City] = distance
-	}
-	return citiesDistance
-}
-
-// BalanceDistance ponderare by linear interpolation (nearest 1 weight, furthest 0)
-func BalanceDistance(distances map[string]float64) (balanceByDistance map[string]float64) {
+// linear interpolation (nearest 1 weight, furthest 0)
+func BalancedDistance(distances map[string]float64) (balanceByDistance map[string]float64) {
 
 	//  balanced distance
 	var balanceNumber float64
@@ -224,8 +228,8 @@ func BalanceDistance(distances map[string]float64) (balanceByDistance map[string
 		}
 	}
 	//find nearest (smallest number)
-	 permanentSmallest := biggest
-	 smallest := biggest
+	permanentSmallest := biggest
+	smallest := biggest
 
 	for _, v := range distances {
 		if v < permanentSmallest {
@@ -236,7 +240,7 @@ func BalanceDistance(distances map[string]float64) (balanceByDistance map[string
 	// calculate balanced numbers
 	for i, v := range distances {
 		balanceNumber = (v - smallest) / (biggest - smallest)
-		balanceNumber--
+		balanceNumber --
 		balanceNumber *= -1
 		// overwrite distance with balanced distance
 		distances[i] = balanceNumber
@@ -245,10 +249,31 @@ func BalanceDistance(distances map[string]float64) (balanceByDistance map[string
 	return distances
 }
 
-// todo refactor calculate_temps and calulate_rain to one function
+func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo, a *[]float64) {
 
-// CalculateTemps where we count the expected celsius for next five days
-func CalculateTemps(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo) (forecastCelsius []float64) {
+	var totalBalance float64
+	var totalTemp float64
+
+	// count next five days
+	for day := 0; day < 5; day++ {
+		totalBalance = 0
+		totalTemp = 0
+		// info --> every city
+		for _, v := range cityInfo {
+			totalBalance += balance[v.City]
+			totalTemp += v.Rain[day] * balance[v.City]
+		}
+		// cut off 2 decimal
+		untruncated := totalTemp / totalBalance
+		truncated := float64(int(untruncated*100)) / 100
+		// put data to container
+		*a = append(*a, truncated)
+	}
+	wg.Done()
+
+}
+
+func CalculateTemp(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo, a *[]float64) {
 
 	var totalBalance float64
 	var totalTemp float64
@@ -266,41 +291,28 @@ func CalculateTemps(balance map[string]float64, cityInfo map[string]cityStructs.
 		untruncated := totalTemp / totalBalance
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
-		forecastCelsius = append(forecastCelsius, truncated)
+		*a = append(*a, truncated)
+
 	}
-	return forecastCelsius
-}
-
-//CalculateRain where we count the expected raining chance for next five days
-func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo) (forecastRain []float64) {
-
-	var totalBalance float64
-	var totalCelsius float64
-
-	// count next five days
-	for day := 0; day < 5; day++ {
-		totalBalance = 0
-		totalCelsius = 0
-		// info --> every city
-		for _, v := range cityInfo {
-			totalBalance += balance[v.City]
-			totalCelsius += v.Rain[day] * balance[v.City]
-		}
-		// cut off 2 decimal
-		untruncated := totalCelsius / totalBalance
-		truncated := float64(int(untruncated*100)) / 100
-		// put data to container
-		forecastRain = append(forecastRain, truncated)
-	}
-	return forecastRain
+	wg.Done()
 }
 
 // TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy (ready)
 // egyben látszódjon egy egy adattípusról, hogy mik az elemei és mik a rá definiált fugvények  (?)
+// order Cities by Timestamp
+func (slice CitiesInfo) Len() int {
+	return len(slice)
+}
 
+func (slice CitiesInfo) Less(i, j int) bool {
+	return slice[i].Timestamp < slice[j].Timestamp
+}
 
+func (slice CitiesInfo) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
 
-// PostCity saving new city
+// saving new city
 func PostCity(c *gin.Context) {
 
 	var json cityStructs.CityInfo
@@ -325,17 +337,15 @@ func PostCity(c *gin.Context) {
 }
 
 // TODO használjunk visszatérési érték változónevet is. (ready)
-
-// NearestCityDataInTime is a filter where we get back just one city (exm if we have 3 becs back just one) which is the most relevant by time
-func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (filteredCitiesReturnValue map[string]cityStructs.CityInfo) {
+func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (filteredCities map[string]cityStructs.CityInfo) {
 	// TODO én MAP ez használnék ahol a város neve a kulcs  (ready)
 	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
 
-	filteredCities := make(map[string]cityStructs.CityInfo)
+	citiesDistance := make(map[string]cityStructs.CityInfo)
 
 	for _, v := range allCities {
 
-		oldDataCityDistanceTime := filteredCities[v.City].Timestamp - timestamp
+		oldDataCityDistanceTime := citiesDistance[v.City].Timestamp - timestamp
 		if oldDataCityDistanceTime < 0 {
 			oldDataCityDistanceTime *= -1
 		}
@@ -344,13 +354,110 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 		if newDataCityDistanceTime < 0 {
 			newDataCityDistanceTime *= -1
 		}
-		// saved if the new data is nearer or the city doesnt exist (timestamp = 0)
+
 		if oldDataCityDistanceTime > newDataCityDistanceTime || filteredCities[v.City].Timestamp == 0 {
-			filteredCities[v.City] = v
+			citiesDistance[v.City] = v
 		}
 	}
-
-	return filteredCities
+	return citiesDistance
 }
 
+// linear interpolation (nearest 1 weight, furthest 0)
+func mergeMaps(x map[string]float64, y map[string]float64) map[string]float64 {
+	for k, v := range x {
+		y[k] = v
+	}
+	return y
+}
 
+//func CountDistance(currentPlaceAndTime cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) map[string]float64 {
+//
+//	wg.Add(2)
+//	var distances map[string]float64
+//
+//	cityHalf1 := make(map[string]cityStructs.CityInfo)
+//	cityHalf2:= make(map[string]cityStructs.CityInfo)
+//
+//	cutter := 0
+//	for key, val := range filteredCities {
+//		if cutter%2 == 0 {
+//			cityHalf1[key] = val
+//		} else {
+//			cityHalf2[key] = val
+//		}
+//		cutter ++
+//	}
+//
+//	go CountCitiesDistance(currentPlaceAndTime, cityHalf1, &distances)
+//	go CountCitiesDistance(currentPlaceAndTime, cityHalf2, &distances)
+//	wg.Wait()
+//	return distances
+//}
+
+//Todo pointer helyett channeleket irj,
+//Todo 1. feldolgozo Process ( StartDatabaseWritingNode)
+//Todo 2. feldolgozando elemeket tartalmazo csatorna letrehozasa
+// Todo 3. response elemeket tartalmazo csatorna letrehozasa
+//Todo 4.   eleinditasz barmennyit
+// Todo 5. ciklus ami a valaszcsatornat dolgozza fel
+
+
+func DistanceCounter(procNumber int,cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
+
+	var wg sync.WaitGroup
+
+	result := make(map[string]float64)
+	var names []string
+	for _, v := range filteredCities {
+		names = append(names, v.City)
+	}
+
+	//channels
+	in := make(chan chan map[string]float64)
+
+	//make processor
+	for i:=0; i < procNumber;i++ {
+		go DistanceCounterProcess(in, cordinate, filteredCities, names, i*10)
+	}
+
+	// Send data until left
+	for n := 0; n < len(filteredCities); n++ {
+
+		mutex.Lock()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			c := make(chan map[string]float64)
+			in <- c
+			z := <-c
+
+			for k, v := range z {
+				result[k] = v
+			}
+			mutex.Unlock()
+		}()
+	}
+
+	wg.Wait()
+	Counter = 0
+	return result
+
+}
+
+func DistanceCounterProcess(in chan chan map[string]float64, cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo, names []string, procNum int) {
+
+	var distance float64
+	result := make(map[string]float64)
+
+	for in := range in {
+
+		latitudeDistance := cordinate.Lat - filteredCities[names[Counter]].Geo.Lat
+		longitudeDistance := cordinate.Lng - filteredCities[names[Counter]].Geo.Lat
+
+		distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
+		result[filteredCities[names[Counter]].City] = distance
+		Counter ++
+		in <- result
+
+	}
+}

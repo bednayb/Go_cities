@@ -13,7 +13,7 @@ func TestCheckDistance(t *testing.T) {
 	mockOneCity["becs"] =	cityStructs.CityInfo{"becs", cityStructs.Geo{94, 92}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 100}
 	mockOneCity["sopron"] =	cityStructs.CityInfo{"sopron", cityStructs.Geo{79, 80}, [5]float64{20, 3, 17, 5, 6}, [5]float64{0.2, 0.6, 0.4, 0.5, 0.6}, 100}
 
-	resultOneCity := Check_distance(cityStructs.CoordinateAndTime{100, 100, 3}, mockOneCity)
+	resultOneCity := CountCitiesDistance(cityStructs.CoordinateAndTime{100, 100, 3}, mockOneCity)
 	expectedValue := make(map[string]float64)
 	expectedValue["bp"] = 5
 	expectedValue["becs"] = 10
