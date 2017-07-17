@@ -2,7 +2,6 @@ package citiesFunction
 
 import (
 	"flag"
-	"fmt"
 	"github.com/bednayb/Go_cities/cityStructs"
 	"github.com/bednayb/Go_cities/databases/mockDatabase"
 	"github.com/bednayb/Go_cities/databases/productionDatabase"
@@ -25,11 +24,6 @@ type CitiesInfo []cityStructs.CityInfo
 
 // CityDatabase is collection of cities
 var CityDatabase CitiesInfo
-
-var mutex = &sync.Mutex{}
-
-// Counter change the city's name at DistanceCounterProcess
-var Counter = 0
 
 //ConfigSettings here you can choose which settings file will be used (default is development)
 func ConfigSettings(configFile *string) {
@@ -383,38 +377,6 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 	return citiesDistance
 }
 
-// linear interpolation (nearest 1 weight, furthest 0)
-//func mergeMaps(x map[string]float64, y map[string]float64) map[string]float64 {
-//	for k, v := range x {
-//		y[k] = v
-//	}
-//	return y
-//}
-
-//func CountDistance(currentPlaceAndTime cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) map[string]float64 {
-//
-//	wg.Add(2)
-//	var distances map[string]float64
-//
-//	cityHalf1 := make(map[string]cityStructs.CityInfo)
-//	cityHalf2:= make(map[string]cityStructs.CityInfo)
-//
-//	cutter := 0
-//	for key, val := range filteredCities {
-//		if cutter%2 == 0 {
-//			cityHalf1[key] = val
-//		} else {
-//			cityHalf2[key] = val
-//		}
-//		cutter ++
-//	}
-//
-//	go CountCitiesDistance(currentPlaceAndTime, cityHalf1, &distances)
-//	go CountCitiesDistance(currentPlaceAndTime, cityHalf2, &distances)
-//	wg.Wait()
-//	return distances
-//}
-
 //Todo pointer helyett channeleket irj,
 //Todo 1. feldolgozo Process ( StartDatabaseWritingNode)
 //Todo 2. feldolgozando elemeket tartalmazo csatorna letrehozasa
@@ -433,34 +395,27 @@ func DistanceCounter(coordinate cityStructs.CoordinateAndTime, filteredCities ma
 	//make channel
 	in := make(chan cityStructs.CityInfo, 5)
 	out := make(chan Out, 5)
-	//make processor
 
+	//make processor
 	go DistanceCounterProcess(in, coordinate, out, &wg)
 	go DistanceCounterProcess(in, coordinate, out, &wg)
 
 	// Send data until left
 	for _, cityInfo := range filteredCities {
-
 		wg.Add(1)
-
 		in <- cityInfo
 	}
 	go func() {
 		for {
 			select {
-
 			case res := <-out:
-
-				fmt.Println(res)
 				result[res.CityName] = res.Distance
 				wg.Done()
 			}
 		}
 	}()
-
 	wg.Wait()
 	return result
-
 }
 
 //DistanceCounterProcess count the distances of city and send back to DistanceCounter
@@ -486,7 +441,7 @@ func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs
 }
 
 // necesseary to not send back map because
-//if one goroutine is writing to a map, no other goroutine should be reading or writing the map concurrently. If the runtime detects this condition, it prints a diagnosis and crashes the program. (https://golang.org/doc/go1.6#runtime)
+// if one goroutine is writing to a map, no other goroutine should be reading or writing the map concurrently. If the runtime detects this condition, it prints a diagnosis and crashes the program. (https://golang.org/doc/go1.6#runtime)
 type Out struct {
 	CityName string
 	Distance float64
