@@ -269,7 +269,7 @@ func BalancedDistanceByLinearInterpolation(distances map[string]float64) (balanc
 	return distances
 }
 //CalculateRain where we count the expected raining chance for next five days
-func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo, a *[]float64) {
+func CalculateRain(balancedCityDistance map[string]float64, cityInfo map[string]cityStructs.CityInfo, ForecastRainingChance *[]float64) {
 
 	var totalBalance float64
 	var totalTemp float64
@@ -280,20 +280,20 @@ func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.C
 		totalTemp = 0
 		// v --> every city
 		for _, v := range cityInfo {
-			totalBalance += balance[v.City]
-			totalTemp += v.Rain[day] * balance[v.City]
+			totalBalance += balancedCityDistance[v.City]
+			totalTemp += v.Rain[day] * balancedCityDistance[v.City]
 		}
 		// cut off 2 decimal
 		untruncated := totalTemp / totalBalance
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
-		*a = append(*a, truncated)
+		*ForecastRainingChance = append(*ForecastRainingChance, truncated)
 	}
 	wg.Done()
 
 }
 //CalculateTemp where we count the expected Celsius chance for next five days
-func CalculateTemp(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo, a *[]float64) {
+func CalculateTemp(balancedCityDistance map[string]float64, cityInfo map[string]cityStructs.CityInfo, ForecastTemps *[]float64) {
 
 	var totalBalance float64
 	var totalTemp float64
@@ -304,14 +304,14 @@ func CalculateTemp(balance map[string]float64, cityInfo map[string]cityStructs.C
 		totalTemp = 0
 		// info --> every city
 		for _, v := range cityInfo {
-			totalBalance += balance[v.City]
-			totalTemp += v.Temp[day] * balance[v.City]
+			totalBalance += balancedCityDistance[v.City]
+			totalTemp += v.Temp[day] * balancedCityDistance[v.City]
 		}
 		// cut off 2 decimal
 		untruncated := totalTemp / totalBalance
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
-		*a = append(*a, truncated)
+		*ForecastTemps = append(*ForecastTemps, truncated)
 
 	}
 	wg.Done()
@@ -424,7 +424,7 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 // Todo 5. ciklus ami a valaszcsatornat dolgozza fel
 
 // DistanceCounter where we count every city's distance from an exact place
-func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
+func DistanceCounter(procNumber int, coordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
 
 	var wg sync.WaitGroup
 
@@ -442,7 +442,7 @@ func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, fi
 
 	//make processor
 	for i := 0; i < procNumber; i++ {
-		go DistanceCounterProcess(in, cordinate, filteredCities, names)
+		go DistanceCounterProcess(in, coordinate, filteredCities, names)
 	}
 
 	// Send data until left
@@ -471,7 +471,7 @@ func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, fi
 
 }
 //DistanceCounterProcess count the distances of city and send back to DistanceCounter
-func DistanceCounterProcess(in chan chan map[string]float64, cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo, names []string) {
+func DistanceCounterProcess(in chan chan map[string]float64, coordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo, names []string) {
 
 	var distance float64
 	CityNameWithDistance := make(map[string]float64)
@@ -479,8 +479,8 @@ func DistanceCounterProcess(in chan chan map[string]float64, cordinate cityStruc
 	for in := range in {
 
 		// count distance
-		latitudeDistance := cordinate.Lat - filteredCities[names[Counter]].Geo.Lat
-		longitudeDistance := cordinate.Lng - filteredCities[names[Counter]].Geo.Lat
+		latitudeDistance := coordinate.Lat - filteredCities[names[Counter]].Geo.Lat
+		longitudeDistance := coordinate.Lng - filteredCities[names[Counter]].Geo.Lat
 		distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
 
 		// add distance to city's name
