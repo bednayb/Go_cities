@@ -2,6 +2,7 @@ package citiesFunction
 
 import (
 	"flag"
+	"fmt"
 	"github.com/bednayb/Go_cities/cityStructs"
 	"github.com/bednayb/Go_cities/databases/mockDatabase"
 	"github.com/bednayb/Go_cities/databases/productionDatabase"
@@ -12,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"fmt"
 )
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
@@ -27,6 +27,7 @@ type CitiesInfo []cityStructs.CityInfo
 var CityDatabase CitiesInfo
 
 var mutex = &sync.Mutex{}
+
 // Counter change the city's name at DistanceCounterProcess
 var Counter = 0
 
@@ -186,7 +187,7 @@ func GetExpectedForecast(c *gin.Context) {
 	filteredCitiesbyTime := NearestCityDataInTime(CityDatabase, timestampConvertToInt)
 
 	// count all distance with channels
-	citiesDistance := DistanceCounter( presentData, filteredCitiesbyTime)
+	citiesDistance := DistanceCounter(presentData, filteredCitiesbyTime)
 
 	// count all distances
 	//distances := CountDistance(presentData, filteredCitiesbyTime)
@@ -291,7 +292,7 @@ func CalculateRain(balancedCityDistance map[string]float64, cityInfo map[string]
 }
 
 //CalculateTemp where we count the expected Celsius chance for next five days
-func CalculateTemp(balancedCityDistance map[string]float64, cityInfo map[string]cityStructs.CityInfo, ForecastTemps *[]float64,databaseWaitGroup *sync.WaitGroup) {
+func CalculateTemp(balancedCityDistance map[string]float64, cityInfo map[string]cityStructs.CityInfo, ForecastTemps *[]float64, databaseWaitGroup *sync.WaitGroup) {
 
 	var totalBalance float64
 	var totalTemp float64
@@ -429,20 +430,13 @@ func DistanceCounter(coordinate cityStructs.CoordinateAndTime, filteredCities ma
 	// because of the append we need to declare here by make
 	result := make(map[string]float64)
 
-
-	// contains every filtered city's name
-	var names []string
-	for _, v := range filteredCities {
-		names = append(names, v.City)
-	}
-
 	//make channel
-	in := make(chan cityStructs.CityInfo,5)
-	out := make(chan map[string]float64,5)
+	in := make(chan cityStructs.CityInfo, 5)
+	out := make(chan Out, 5)
 	//make processor
 
-		go DistanceCounterProcess(in, coordinate, out, &wg)
-	    go DistanceCounterProcess(in, coordinate, out, &wg)
+	go DistanceCounterProcess(in, coordinate, out, &wg)
+	go DistanceCounterProcess(in, coordinate, out, &wg)
 
 	// Send data until left
 	for _, cityInfo := range filteredCities {
@@ -451,52 +445,49 @@ func DistanceCounter(coordinate cityStructs.CoordinateAndTime, filteredCities ma
 
 		in <- cityInfo
 	}
-		go func() {
-			for {
-				select {
+	go func() {
+		for {
+			select {
 
-				case res := <-out:
+			case res := <-out:
 
-					//result = append(result, res)
-
-					for k, v := range res {
-						result[k] = v
-					}
-
-					wg.Done()
-
-				}
+				fmt.Println(res)
+				result[res.CityName] = res.Distance
+				wg.Done()
 			}
-		}()
+		}
+	}()
 
 	wg.Wait()
-	fmt.Println("i am the result",result, len(result))
 	return result
 
 }
-//DistanceCounterProcess count the distances of city and send back to DistanceCounter
-func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs.CoordinateAndTime, out chan map[string]float64, wg *sync.WaitGroup) {
 
+//DistanceCounterProcess count the distances of city and send back to DistanceCounter
+func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs.CoordinateAndTime, out chan Out, wg *sync.WaitGroup) {
 
 	var distance float64
-	CityNameWithDistance := make(map[string]float64)
 
 	for {
 		select {
-			case cityInfo := <-in:
-				defer wg.Done()
-		// count distance
-		latitudeDistance := coordinate.Lat - cityInfo.Geo.Lat
-		longitudeDistance := coordinate.Lng - cityInfo.Geo.Lat
-		distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
+		case cityInfo := <-in:
+			defer wg.Done()
+			// count distance
+			latitudeDistance := coordinate.Lat - cityInfo.Geo.Lat
+			longitudeDistance := coordinate.Lng - cityInfo.Geo.Lat
+			distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
 
-		// add distance to city's name
-		CityNameWithDistance[cityInfo.City] = distance
-		// increase Counter (for changing new city's name)
-
-		//send back
-		out <- CityNameWithDistance
-
+			//response data Out type and make map just at other side because with map can be gorutine problems (see at type Out)
+			res := Out{cityInfo.City, distance}
+			//send back
+			out <- res
+		}
 	}
 }
+
+// necesseary to not send back map because
+//if one goroutine is writing to a map, no other goroutine should be reading or writing the map concurrently. If the runtime detects this condition, it prints a diagnosis and crashes the program. (https://golang.org/doc/go1.6#runtime)
+type Out struct {
+	CityName string
+	Distance float64
 }
