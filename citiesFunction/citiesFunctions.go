@@ -32,7 +32,7 @@ var wg sync.WaitGroup
 // Counter change the city's name at DistanceCounterProcess
 var Counter = 0
 
-//ConfigSettings here you can choose which settings file will be used
+//ConfigSettings here you can choose which settings file will be used (default is development)
 func ConfigSettings(configFile *string) {
 
 	var config = flag.String("config", "", "placeholder")
@@ -46,7 +46,7 @@ func ConfigSettings(configFile *string) {
 	}
 }
 
-//Init settings the config file;s contents
+//Init settings the config file's contents
 func Init(conf string) {
 	if conf == "development" {
 		for i:=0; i < len(mockDatabase.Cities);i++ {
