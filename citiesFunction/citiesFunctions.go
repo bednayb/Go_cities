@@ -19,13 +19,18 @@ import (
 // TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? ez full kodos :))
 // Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
 
-type CitiesInfo []cityStructs.CityInfo
 
+// CitiesInfo is collection of cities
+type CitiesInfo []cityStructs.CityInfo
+// CityDatabase is collection of cities
+var CityDatabase CitiesInfo
 var mutex sync.Mutex
-var CityDatabase []cityStructs.CityInfo
+
 var wg sync.WaitGroup
+
 var Counter = 0
 
+//ConfigSettings here you can choose whice settings file will be used
 func ConfigSettings(configFile *string) {
 
 	var config = flag.String("config", "", "placeholder")
@@ -51,11 +56,13 @@ func Init(conf string) {
 	}
 }
 
+// GetAllCity shows all cities
 func GetAllCity(c *gin.Context) {
 	cities := CityDatabase
 	c.JSON(200, cities)
 }
 
+// GetCityByName shows every data where the city name is same (example: becs)
 func GetCityByName(c *gin.Context) {
 
 	cities := CityDatabase
@@ -105,7 +112,7 @@ func GetExpectedForecast(c *gin.Context) {
 	lng := c.Query("lng")
 	timestamp := c.Query("timestamp")
 
-	// TODO Hiba ellenőrzéskor értelmes hibaüzenetet szeretnénk adni pontosan arról ami a hibát okozta (ready)
+	// TODO Hiba ellenőrzéskor értelmes hibaüzenetet szeretnénk adni pontosan arról ami citiesDistance hibát okozta (ready)
 
 	var dataDoenstExistsMessage string
 
@@ -121,7 +128,7 @@ func GetExpectedForecast(c *gin.Context) {
 	if len(dataDoenstExistsMessage) > 0 {
 		content := gin.H{"error_message": dataDoenstExistsMessage}
 		c.JSON(400, content)
-		// TODO itt érdemes lenne egy return, hogy ne folytassuk a futást ha hiba volt  (ready)
+		// TODO itt érdemes lenne egy return, hogy ne folytassuk citiesDistance futást ha hiba volt  (ready)
 		return
 	}
 
@@ -146,45 +153,45 @@ func GetExpectedForecast(c *gin.Context) {
 	if len(convertProblem) > 0 {
 		content := gin.H{"error_message ": convertProblem}
 		c.JSON(400, content)
-		// TODO itt érdemes lenne egy return, hogy ne folytassuk a futást ha hiba volt  (ready)
+		// TODO itt érdemes lenne egy return, hogy ne folytassuk citiesDistance futást ha hiba volt  (ready)
 		return
 	}
 
 	if timestampConvertToInt < 0 {
 		content := gin.H{"error_message ": "timestamp should be bigger than 0"}
 		c.JSON(400, content)
-		// TODO itt érdemes lenne egy return, hogy ne folytassuk a futást ha hiba volt  (ready)
+		// TODO itt érdemes lenne egy return, hogy ne folytassuk citiesDistance futást ha hiba volt  (ready)
 		return
 	}
 
 	//put data to struct
 	// TODO a fenti parsolások mindegyikénél előfordulhat hiba, amit így teljesen figyelmen kívűl hagyunk (ready)
 	// TODO a fentabbi ellenőrzési szisztémával adhatunk hibaüzenetet hogy melyikből nem sikerült számot kinyernünk. (ready)  (timestampnel minuszt nem fogadunk el -- Ricsi)
-	// + Ellenőrizhető hogy a szám valós tartományban van e.
+	// + Ellenőrizhető hogy citiesDistance szám valós tartományban van e.
 	// hiba esetén itt se menjünk tovább.
 
 	// data from the URL
 	presentData := cityStructs.CoordinateAndTime{latitudeConvertToFloat64, longitudeConvertToFloat64, timestampConvertToInt}
 
 	// filter for the nearest data (by timestamp)
-	filteredCities := NearestCityDataInTime(CityDatabase, timestampConvertToInt)
+	filteredCitiesbyTime := NearestCityDataInTime(CityDatabase, timestampConvertToInt)
 
 	// count all distance with channels
-	a := DistanceCounter(15, presentData, filteredCities)
+	citiesDistance := DistanceCounter(15, presentData, filteredCitiesbyTime)
 
 	// count all distances
-	//distances := CountDistance(presentData, filteredCities)
+	//distances := CountDistance(presentData, filteredCitiesbyTime)
 
 	// balanced the distances
-	balance := BalancedDistance(a)
+	balancedDistance := BalancedDistanceByLinearInterpolation(citiesDistance)
 
 	// counting temps and raining data for next 5 days
 	// Todo csatornaval
 	wg.Add(2)
 	var forecastRain []float64
 	var forecastCelsius []float64
-	go CalculateRain(balance, filteredCities, &forecastRain)
-	go CalculateTemp(balance, filteredCities, &forecastCelsius)
+	go CalculateRain(balancedDistance, filteredCitiesbyTime, &forecastRain)
+	go CalculateTemp(balancedDistance, filteredCitiesbyTime, &forecastCelsius)
 	wg.Wait()
 
 	// send data
@@ -212,8 +219,8 @@ func GetExpectedForecast(c *gin.Context) {
 //	wg.Done()
 //}
 
-// linear interpolation (nearest 1 weight, furthest 0)
-func BalancedDistance(distances map[string]float64) (balanceByDistance map[string]float64) {
+// BalanceDistance ponderare by linear interpolation (nearest 1 weight, furthest 0)
+func BalancedDistanceByLinearInterpolation(distances map[string]float64) (balanceByDistance map[string]float64) {
 
 	//  balanced distance
 	var balanceNumber float64
@@ -249,7 +256,7 @@ func BalancedDistance(distances map[string]float64) (balanceByDistance map[strin
 
 	return distances
 }
-
+//CalculateRain where we count the expected raining chance for next five days
 func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo, a *[]float64) {
 
 	var totalBalance float64
@@ -259,7 +266,7 @@ func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.C
 	for day := 0; day < 5; day++ {
 		totalBalance = 0
 		totalTemp = 0
-		// info --> every city
+		// v --> every city
 		for _, v := range cityInfo {
 			totalBalance += balance[v.City]
 			totalTemp += v.Rain[day] * balance[v.City]
@@ -273,7 +280,7 @@ func CalculateRain(balance map[string]float64, cityInfo map[string]cityStructs.C
 	wg.Done()
 
 }
-
+// BalanceDistance ponderare by linear interpolation (nearest 1 weight, furthest 0)
 func CalculateTemp(balance map[string]float64, cityInfo map[string]cityStructs.CityInfo, a *[]float64) {
 
 	var totalBalance float64
@@ -338,6 +345,8 @@ func PostCity(c *gin.Context) {
 }
 
 // TODO használjunk visszatérési érték változónevet is. (ready)
+
+// NearestCityDataInTime is a filter where we get back just one city (exm if we have 3 becs back just one) which is the most relevant by time
 func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (filteredCities map[string]cityStructs.CityInfo) {
 	// TODO én MAP ez használnék ahol a város neve a kulcs  (ready)
 	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
@@ -364,12 +373,12 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 }
 
 // linear interpolation (nearest 1 weight, furthest 0)
-func mergeMaps(x map[string]float64, y map[string]float64) map[string]float64 {
-	for k, v := range x {
-		y[k] = v
-	}
-	return y
-}
+//func mergeMaps(x map[string]float64, y map[string]float64) map[string]float64 {
+//	for k, v := range x {
+//		y[k] = v
+//	}
+//	return y
+//}
 
 //func CountDistance(currentPlaceAndTime cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) map[string]float64 {
 //
@@ -402,11 +411,15 @@ func mergeMaps(x map[string]float64, y map[string]float64) map[string]float64 {
 //Todo 4.   eleinditasz barmennyit
 // Todo 5. ciklus ami a valaszcsatornat dolgozza fel
 
+// DistanceCounter where we count every city's distance from an exact place
 func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
 
 	var wg sync.WaitGroup
 
+	// because of the append we need to declare here by make
 	result := make(map[string]float64)
+
+	// contains every filtered city's name
 	var names []string
 	for _, v := range filteredCities {
 		names = append(names, v.City)
@@ -431,6 +444,7 @@ func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, fi
 			in <- c
 			z := <-c
 
+			// merge maps
 			for k, v := range z {
 				result[k] = v
 			}
@@ -439,6 +453,7 @@ func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, fi
 	}
 
 	wg.Wait()
+	// its necceseary to Counter equal to 0, because we can have more query and can be out of range
 	Counter = 0
 	return result
 
