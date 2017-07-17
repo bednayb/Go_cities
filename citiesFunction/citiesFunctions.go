@@ -27,7 +27,6 @@ type CitiesInfo []cityStructs.CityInfo
 var CityDatabase CitiesInfo
 
 var mutex sync.Mutex
-
 var wg sync.WaitGroup
 
 var Counter = 0
@@ -434,7 +433,7 @@ func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, fi
 		names = append(names, v.City)
 	}
 
-	//channels
+	//make channel
 	in := make(chan chan map[string]float64)
 
 	//make processor
@@ -471,17 +470,21 @@ func DistanceCounter(procNumber int, cordinate cityStructs.CoordinateAndTime, fi
 func DistanceCounterProcess(in chan chan map[string]float64, cordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo, names []string) {
 
 	var distance float64
-	result := make(map[string]float64)
+	CityNameWithDistance := make(map[string]float64)
 
 	for in := range in {
 
+		// count distance
 		latitudeDistance := cordinate.Lat - filteredCities[names[Counter]].Geo.Lat
 		longitudeDistance := cordinate.Lng - filteredCities[names[Counter]].Geo.Lat
-
 		distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
-		result[filteredCities[names[Counter]].City] = distance
+
+		// add distance to city's name
+		CityNameWithDistance[filteredCities[names[Counter]].City] = distance
+		// increase Counter (for changing new city's name)
 		Counter++
-		in <- result
+		//send back
+		in <- CityNameWithDistance
 
 	}
 }
