@@ -37,34 +37,32 @@ func ConfigSettings(configFile *string) {
 
 	var config = flag.String("config", "", "placeholder")
 	flag.Parse()
-	if *config == "production" {
+	switch *config{
+	case "production":
 		*configFile = "production"
-	} else if *config == "test" {
+	case "test":
 		*configFile = "test"
-	} else {
+	default:
 		*configFile = "development"
 	}
 }
 
-//Init settings the config file's contents
 func Init(conf string) {
-	if conf == "development" {
-		for i:=0; i < len(mockDatabase.Cities);i++ {
+	switch conf {
+	case "development":
+		for i := 0; i < len(mockDatabase.Cities); i++ {
 			CityDatabase = append(CityDatabase, mockDatabase.Cities[i])
 		}
-	} else if conf == "test" {
+	case "test":
 		for i := 0; i < len(testDatabase.Cities); i++ {
 			CityDatabase = append(CityDatabase, testDatabase.Cities[i])
 		}
-	} else if conf == "production" {
+	default:
 		for i := 0; i < len(productionDatabase.Cities); i++ {
 			CityDatabase = append(CityDatabase, productionDatabase.Cities[i])
 		}
 	}
 }
-
-
-
 
 // GetAllCity shows all cities
 func GetAllCity(c *gin.Context) {
