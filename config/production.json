@@ -1,5 +1,5 @@
 {
-  "production": {
-    "database": "cityDatabase"
-  }
+    "Type":"production",
+    "Database": "productionDatabase",
+    "ProcessorNumber": 3
 }

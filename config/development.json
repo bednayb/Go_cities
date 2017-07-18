@@ -1,5 +1,5 @@
 {
-  "development": {
-    "database": "mockDatabase"
-  }
+    "Type":"development",
+    "Database": "mockDatabase",
+    "ProcessorNumber": 5
 }

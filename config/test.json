@@ -1,5 +1,5 @@
 {
-  "test": {
-    "database": "testDatabase"
-  }
+  "Type":"test",
+  "Database": "testDatabase",
+  "ProcessorNumber": 3
 }
