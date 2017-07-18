@@ -28,9 +28,9 @@ func main() {
 	// Confirm which config file is used
 	fmt.Printf("Using config: %s\n", viper.ConfigFileUsed())
 
-	if !viper.IsSet(configFile +".database") {
-		log.Fatal("missing database")
-	}
+	//if !viper.IsSet(configFile +".database") {
+	//	log.Fatal("missing database")
+	//}
 
 	//Settings data
 	citiesFunction.Init(configFile)
