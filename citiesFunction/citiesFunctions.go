@@ -123,13 +123,9 @@ func GetAllCitySQL(c *gin.Context) {
 
 func PostCitySQL(c *gin.Context) {
 
-	type City struct {
-		CityName string `json:"cityName"`
-	}
 
-	var json City
+	var json cityStructs.CityInfo
 	c.Bind(&json) // This will infer what binder to use depending on the content-type header.
-
 
 
 	db, err := sql.Open("mysql", "root:admin@/GoCities")
@@ -138,16 +134,41 @@ func PostCitySQL(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// insert
-	stmt, err := db.Prepare("INSERT City SET CityName=?")
+
+	// insert into City
+
+	stmt, err := db.Prepare("INSERT City SET CityName=? " )
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
 
-	res, err := stmt.Exec(json.CityName)
+	res, err := stmt.Exec(json.City)
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
+	// insert into Info
+	stmt, err = db.Prepare("INSERT CityInfo Set CityId =?")
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	res, err = stmt.Exec(9)
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	// insert into Geo
+	stmt, err = db.Prepare("INSERT Geo Set Longitude=?, Latitude=?")
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	res, err = stmt.Exec(json.Geo.Lng,json.Geo.Lat)
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+
 
 	fmt.Println("heydd",res)
 	c.JSON(200, res)
@@ -157,8 +178,8 @@ func DeleteCitySQL(c *gin.Context) {
 
 	CityID := c.Query("id")
 	CityIDConvertToInt, _ := strconv.ParseInt(CityID, 10, 64)
-	// username/pw is secret :)
-	db, err := sql.Open("mysql", "username:pw@/GoCities")
+
+	db, err := sql.Open("mysql", "root:admin@/GoCities")
 	if err != nil {
 		panic(err.Error())  // Just for example purpose. You should use proper error handling instead of panic
 	}
