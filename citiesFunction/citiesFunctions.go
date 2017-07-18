@@ -12,7 +12,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"fmt"
+	"encoding/json"
+	"os"
 )
+
+
 
 // TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
 // TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (ready, test not works)
@@ -24,6 +29,16 @@ type CitiesInfo []cityStructs.CityInfo
 
 // CityDatabase is collection of cities
 var CityDatabase CitiesInfo
+
+
+// configuration file structure
+type Configuration struct {
+	Type     string
+	Database string
+	ProcessorNumber int
+}
+// ProcessorNumber declaration
+var ProcessorNumber int
 
 //ConfigSettings here you can choose which settings file will be used (default is development)
 func ConfigSettings(configFile *string) {
@@ -41,19 +56,31 @@ func ConfigSettings(configFile *string) {
 }
 
 // Init before run the program settings config contents
-func Init(conf string) {
-	switch conf {
-	case "production":
+func Init(configFile string) {
+
+	file, _ := os.Open("./config/"+ configFile +".json")
+	decoder := json.NewDecoder(file)
+	configuration := Configuration{}
+	err := decoder.Decode(&configuration)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+
+	ProcessorNumber = configuration.ProcessorNumber
+
+	switch configuration.Database {
+	case "productionDatabase":
 		for i := 0; i < len(productionDatabase.Cities); i++ {
 			CityDatabase = append(CityDatabase, productionDatabase.Cities[i])
 		}
-	case "test":
+	case "testDatabase":
 		for i := 0; i < len(testDatabase.Cities); i++ {
 			CityDatabase = append(CityDatabase, testDatabase.Cities[i])
 		}
 	default:
 		for i := 0; i < len(mockDatabase.Cities); i++ {
 			CityDatabase = append(CityDatabase, mockDatabase.Cities[i])
+
 		}
 	}
 }
@@ -181,7 +208,7 @@ func GetExpectedForecast(c *gin.Context) {
 	filteredCitiesbyTime := NearestCityDataInTime(CityDatabase, timestampConvertToInt)
 
 	// count all distance with channels
-	citiesDistance := DistanceCounter(presentData, filteredCitiesbyTime)
+	citiesDistance := DistanceCounter(ProcessorNumber,presentData, filteredCitiesbyTime)
 
 	// count all distances
 	//distances := CountDistance(presentData, filteredCitiesbyTime)
@@ -385,21 +412,25 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 // Todo 5. ciklus ami a valaszcsatornat dolgozza fel
 
 // DistanceCounter where we count every city's distance from an exact place
-func DistanceCounter(coordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
+func DistanceCounter(ProcessorNumber int, coordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
 
 	var wg sync.WaitGroup
+
 
 	// because of the append we need to declare here by make
 	result := make(map[string]float64)
 
+	///////Todo buffer annyi legyen mint ahany csatorna van (ready)
 	//make channel
-	in := make(chan cityStructs.CityInfo, 5)
-	out := make(chan Out, 5)
+	in := make(chan cityStructs.CityInfo, len(filteredCities))
+	out := make(chan Out, len(filteredCities))
 
+
+	//////Todo megadhato proc szam (configbol) (ready)
 	//make processor
-	go DistanceCounterProcess(in, coordinate, out, &wg)
-	go DistanceCounterProcess(in, coordinate, out, &wg)
-
+	for i:= 0 ; i < ProcessorNumber; i++{
+		go DistanceCounterProcess(in, coordinate, out, &wg)
+	}
 	// Send data until left
 	for _, cityInfo := range filteredCities {
 		wg.Add(1)
