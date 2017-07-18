@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/viper"
 	"log"
 	"fmt"
+
 )
 
 func main() {
@@ -28,16 +29,16 @@ func main() {
 	// Confirm which config file is used
 	fmt.Printf("Using config: %s\n", viper.ConfigFileUsed())
 
-	//if !viper.IsSet(configFile +".database") {
-	//	log.Fatal("missing database")
-	//}
-
 	//Settings data
 	citiesFunction.Init(configFile)
+
+	// OPEN SQL
+
 
 	r := gin.Default()
 	v1 := r.Group("/")
 	{
+
 		// list all cities
 		v1.GET("/cities", citiesFunction.GetAllCity)
 		// find specific city by name
@@ -46,6 +47,14 @@ func main() {
 		v1.GET("/avg", citiesFunction.GetExpectedForecast)
 		// add new city
 		v1.POST("/push", citiesFunction.PostCity)
+
+		// list all cities SQL
+		v1.GET("/sql/cities", citiesFunction.GetAllCitySQL)
+		// add new city SQL
+		v1.POST("/sql/push", citiesFunction.PostCitySQL)
+		// add new city SQL
+		v1.DELETE("/sql/delete", citiesFunction.DeleteCitySQL)
+
 	}
 
 	r.Run(":8080")
