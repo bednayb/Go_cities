@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"encoding/json"
 	"os"
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 
@@ -39,6 +41,9 @@ type Configuration struct {
 }
 // ProcessorNumber declaration
 var ProcessorNumber int
+
+var db *sql.DB
+
 
 //ConfigSettings here you can choose which settings file will be used (default is development)
 func ConfigSettings(configFile *string) {
@@ -84,6 +89,107 @@ func Init(configFile string) {
 		}
 	}
 }
+
+// SQL MAGIC
+func GetAllCitySQL(c *gin.Context) {
+	db, err := sql.Open("mysql", "root:admin@/GoCities")
+	if err != nil {
+		panic(err.Error())  // Just for example purpose. You should use proper error handling instead of panic
+	}
+	defer db.Close()
+	rows, err := db.Query("SELECT * FROM City")
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	type City struct {
+		CityId int `json:"id"`
+		CityName string `json:"cityName"`
+	}
+
+	var cities []City
+
+	for rows.Next() {
+		var CityId  int
+		var CityName string
+
+		rows.Scan(&CityId ,&CityName)
+		cities = append(cities, City{CityId, CityName})
+	}
+
+	fmt.Println("hey",cities)
+	c.JSON(200, cities)
+}
+
+func PostCitySQL(c *gin.Context) {
+
+	type City struct {
+		CityName string `json:"cityName"`
+	}
+
+	var json City
+	c.Bind(&json) // This will infer what binder to use depending on the content-type header.
+
+
+
+	db, err := sql.Open("mysql", "root:admin@/GoCities")
+	if err != nil {
+		panic(err.Error())  // Just for example purpose. You should use proper error handling instead of panic
+	}
+	defer db.Close()
+
+	// insert
+	stmt, err := db.Prepare("INSERT City SET CityName=?")
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	res, err := stmt.Exec(json.CityName)
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	fmt.Println("heydd",res)
+	c.JSON(200, res)
+}
+
+func DeleteCitySQL(c *gin.Context) {
+
+	CityID := c.Query("id")
+	CityIDConvertToInt, _ := strconv.ParseInt(CityID, 10, 64)
+	// username/pw is secret :)
+	db, err := sql.Open("mysql", "username:pw@/GoCities")
+	if err != nil {
+		panic(err.Error())  // Just for example purpose. You should use proper error handling instead of panic
+	}
+	defer db.Close()
+
+	// delete
+	stmt, err := db.Prepare("DELETE FROM City WHERE ID=?")
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	res, err := stmt.Exec(CityIDConvertToInt)
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	affect, err := res.RowsAffected()
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	if affect > 0{
+		c.JSON(200, "delete was successful")
+		return
+	}
+
+	c.JSON(200, res)
+}
+
+
+// SQL MAGIC
 
 // GetAllCity shows all cities
 func GetAllCity(c *gin.Context) {
