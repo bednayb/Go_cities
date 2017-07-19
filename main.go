@@ -50,8 +50,12 @@ func main() {
 
 		// list all cities SQL
 		v1.GET("/sql/cities", citiesFunction.GetAllCitySQL)
+		// find specific city by name
+		v1.GET("sql/city/:id", citiesFunction.GetCityByIDSQL)
 		// add new city SQL
 		v1.POST("/sql/push", citiesFunction.PostCitySQL)
+		// make forecast for exact place
+		v1.GET("/sql/avg", citiesFunction.GetExpectedForecastSQL)
 		// add new city SQL
 		v1.DELETE("/sql/delete", citiesFunction.DeleteCitySQL)
 
