@@ -155,7 +155,7 @@ func PostCitySQL(c *gin.Context) {
 	db.QueryRow("SELECT ID FROM City WHERE CityName = ?", json.City).Scan(&cityID)
 
 	// insert into Info
-	stmt, err := db.Prepare("INSERT CityInfo Set CityId =?,Temp=?,Rain=?,Latitude=?,Longitude=?")
+	stmt, err := db.Prepare("INSERT CityInfo Set CityId =?,Date=?,Temp=?,Rain=?,Latitude=?,Longitude=?")
 
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
@@ -183,11 +183,11 @@ func PostCitySQL(c *gin.Context) {
 		}
 	}
 
-	res, err := stmt.Exec(cityID, tempDataToSQL, rainDataToSQL,json.Geo.Lat,json.Geo.Lng)
+	res, err := stmt.Exec(cityID,json.Timestamp,tempDataToSQL, rainDataToSQL,json.Geo.Lat,json.Geo.Lng)
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
-
+go
 	c.JSON(200, res)
 }
 
@@ -265,8 +265,9 @@ func GetCityByIDSQL(c *gin.Context) {
 	c.JSON(200, cities)
 }
 
+
 func GetExpectedForecastSQL(c *gin.Context) {
-	//var wg sync.WaitGroup
+	var wg sync.WaitGroup
 	if len(CityDatabase) == 0 {
 		content := gin.H{"response": "sry we havnt had enough data for calculating yet"}
 		c.JSON(200, content)
@@ -333,20 +334,33 @@ func GetExpectedForecastSQL(c *gin.Context) {
 	// data from the URL
 	presentData := cityStructs.CoordinateAndTime{latitudeConvertToFloat64, longitudeConvertToFloat64, timestampConvertToInt}
 
+	//filtered Cities
+	cities := CitiesFromSQL(timestampConvertToInt)
 
+	CitiesDataConvertToMap := DataToMap(cities)
+
+	citiesDistance := DistanceCounter(ProcessorNumber, presentData, CitiesDataConvertToMap)
+
+	// count all distance with channels
+	//citiesDistance := DistanceCounter(ProcessorNumber, presentData, CitiesDataConvertToMap)
+
+
+	// balanced the distances
+	balancedDistance := BalancedDistanceByLinearInterpolation(citiesDistance)
+	// counting temps and raining data for next 5 days
+	// Todo csatornaval
+	wg.Add(2)
+	var forecastRain []float64
+	var forecastCelsius []float64
+	go CalculateRain(balancedDistance, CitiesDataConvertToMap, &forecastRain, &wg)
+	go CalculateTemp(balancedDistance, CitiesDataConvertToMap, &forecastCelsius, &wg)
+	wg.Wait()
 
 	// send data
-	content := gin.H{"urlData":presentData}
+	content := gin.H{"expected celsius next 5 days": forecastCelsius, "expected raining chance next 5 days":forecastRain}
 	c.JSON(200, content)
 
-
 }
-
-
-
-
-
-
 
 // GetAllCity shows all cities
 func GetAllCity(c *gin.Context) {
@@ -649,6 +663,69 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 	return citiesDistance
 }
 
+func CitiesFromSQL(timestamp int64) (filteredCities map[string]cityStructs.CityData){
+	// TODO én MAP ez használnék ahol a város neve a kulcs  (ready)
+	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
+
+	// open SQL
+	db, err := sql.Open("mysql", "root:admin@/GoCities")
+	if err != nil {
+		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+	}
+
+	defer db.Close()
+
+	rows, err := db.Query("select CityId,Any_Value(InfoId),Any_Value(Date),Any_value(Latitude),Any_value(Longitude),Any_value(Temp),Any_value(Rain) from CityInfo")
+	//rows, err := db.Query("select CityId,Any_Value(InfoId),Any_Value(Date),Any_Value(Latitude) from CityInfo GROUP BY CityId")
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+
+	var cities []cityStructs.CityData
+
+	for rows.Next() {
+
+		var CityID int
+		var InfoId int
+		var Date int
+		var Latitude float64
+		var Longitude float64
+		var Temp string
+	    var Rain string
+
+		rows.Scan(&CityID, &InfoId, &Date,&Latitude,&Longitude,&Temp,&Rain)
+		cities = append(cities, cityStructs.CityData{CityID, InfoId, Date, Latitude, Longitude, Temp, Rain})
+	}
+
+	citiesDistance := make(map[string]cityStructs.CityData)
+	timestampToInt := int(timestamp)
+
+
+
+	for _, v := range cities {
+		s := strconv.Itoa(v.CityID)
+		var oldDataCityDistanceTime int
+		var cityDistanceTimestamp = int(citiesDistance[s].Date)
+		oldDataCityDistanceTime = cityDistanceTimestamp - timestampToInt
+		if oldDataCityDistanceTime < 0 {
+			oldDataCityDistanceTime *= -1
+		}
+	var newDataCityDistanceTime int
+		newDataCityDistanceTime = v.Date - timestampToInt
+		if newDataCityDistanceTime < 0 {
+			newDataCityDistanceTime *= -1
+		}
+
+		if oldDataCityDistanceTime > newDataCityDistanceTime || citiesDistance[s].Date == 0 {
+			citiesDistance[s] = v
+		}
+	}
+
+	return citiesDistance
+
+}
+
+
 //Todo pointer helyett channeleket irj,
 //Todo 1. feldolgozo Process ( StartDatabaseWritingNode)
 //Todo 2. feldolgozando elemeket tartalmazo csatorna letrehozasa
@@ -660,6 +737,7 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 func DistanceCounter(ProcessorNumber int, coordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
 
 	var wg sync.WaitGroup
+
 
 	// because of the append we need to declare here by make
 	result := make(map[string]float64)
@@ -702,8 +780,10 @@ func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs
 		case cityInfo := <-in:
 			defer wg.Done()
 			// count distance
+
+
 			latitudeDistance := coordinate.Lat - cityInfo.Geo.Lat
-			longitudeDistance := coordinate.Lng - cityInfo.Geo.Lat
+			longitudeDistance := coordinate.Lng - cityInfo.Geo.Lng
 			distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
 
 			//response data Out type and make map just at other side because with map can be gorutine problems (see at type Out)
@@ -719,4 +799,41 @@ func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs
 type Out struct {
 	CityName string
 	Distance float64
+}
+
+func DataToMap(a map[string]cityStructs.CityData)(filteredCities_k map[string]cityStructs.CityInfo){
+
+
+	filteredCities := make(map[string]cityStructs.CityInfo)
+
+	for _,v:= range a{
+		cityName := strconv.Itoa(v.CityID)
+
+		stringSliceTemp := strings.SplitN(v.Temp, ",",5)
+		stringSliceRain := strings.SplitN(v.Rain, ",",5)
+
+		var stringToFloatTemp = [5]float64{}
+		var stringToFloatRain = [5]float64{}
+
+		for i,v := range stringSliceTemp{
+
+			f,_ := strconv.ParseFloat(v, 64)
+			stringToFloatTemp[i] = f
+		}
+
+		for i,v := range stringSliceRain{
+
+			f,_ := strconv.ParseFloat(v, 64)
+			stringToFloatRain[i] = f
+		}
+
+		truncatedLatitude := float64(int(v.Latitude*100)) / 100
+		truncatedLongtitude := float64(int(v.Longitude*100)) / 100
+
+		date := int64(v.Date)
+
+		filteredCities[cityName] = cityStructs.CityInfo{cityName, cityStructs.Geo{truncatedLatitude, truncatedLongtitude}, stringToFloatTemp, stringToFloatRain,date }
+	}
+
+	return filteredCities
 }
