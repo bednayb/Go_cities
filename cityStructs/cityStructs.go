@@ -27,3 +27,13 @@ type Geo struct {
 	Lat float64 `json:"Lat"`
 	Lng float64 `json:"Lng"`
 }
+
+type CityData struct {
+	CityID int
+	InfoId int
+	Date int
+	Latitude float64
+	Longitude float64
+	Temp string
+	Rain string
+}
