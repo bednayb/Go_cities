@@ -1,7 +1,4 @@
 package cityStructs
-// TODO gorm? nem szükséges egyelőre sehová, ezeket tisztítsuk ki (ready)
-// TODO form ot használjuk valamire? (ready)
-// ebből a sorból töröltem a, amit már végrehajtottál
 
 // CityInfo is data about city
 type CityInfo struct {
@@ -9,7 +6,7 @@ type CityInfo struct {
 	Geo       Geo
 	Temp      [5]float64 `json:"Temp"`
 	Rain      [5]float64 `json:"Rain"`
-	Timestamp int64      `json:"Timestamp"` // TODO olvashatóság kedvéért legyen space a form és a json között (ready)
+	Timestamp int64      `json:"Timestamp"`
 }
 
 // CitiesInfo is collection of cities
@@ -28,12 +25,13 @@ type Geo struct {
 	Lng float64 `json:"Lng"`
 }
 
+// CityData is contains cityInfo data from slq db
 type CityData struct {
-	CityID int
-	InfoId int
-	Date int
-	Latitude float64
+	CityID    int
+	InfoID    int
+	Date      int
+	Temp      string
+	Rain      string
+	Latitude  float64
 	Longitude float64
-	Temp string
-	Rain string
 }

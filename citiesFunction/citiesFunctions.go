@@ -19,11 +19,6 @@ import (
 	"sync"
 )
 
-// TODO ez nagyon úgy tűnik mintha a mock adatokat adnánk vissza minden esetben mikor a városokat lekérdezzük! (ready)
-// TODO A mock adatokkal való tesztelést különítsük el a valós működéstől, csak akkor induljon mock adatokkal a program ha arra kértük (ready, test not works)
-// TODO live/demo setupoláshoz vagy config file-t használjunk, vagy argumentumokat program indításkor (? ez full kodos :))
-// Ricsi --> akkor hasznalj mock adatokat ha go run main.go --mock al hivod meg kul, (go run main.go) azzal ami el van mentve
-
 // CitiesInfo is collection of cities
 type CitiesInfo []cityStructs.CityInfo
 
@@ -87,7 +82,7 @@ func Init(configFile string) {
 	}
 }
 
-// SQL MAGIC
+// GetAllCitySQL list all cities from SQL database
 func GetAllCitySQL(c *gin.Context) {
 	db, err := sql.Open("mysql", "root:admin@/GoCities")
 	if err != nil {
@@ -100,7 +95,7 @@ func GetAllCitySQL(c *gin.Context) {
 	}
 
 	type City struct {
-		CityID int    `json:"id"`
+		CityID   int    `json:"id"`
 		CityName string `json:"cityName"`
 	}
 
@@ -117,6 +112,7 @@ func GetAllCitySQL(c *gin.Context) {
 	c.JSON(200, cities)
 }
 
+// PostCitySQL add new city to SQL database
 func PostCitySQL(c *gin.Context) {
 
 	var json cityStructs.CityInfo
@@ -183,14 +179,14 @@ func PostCitySQL(c *gin.Context) {
 		}
 	}
 
-	res, err := stmt.Exec(cityID,json.Timestamp,tempDataToSQL, rainDataToSQL,json.Geo.Lat,json.Geo.Lng)
+	res, err := stmt.Exec(cityID, json.Timestamp, tempDataToSQL, rainDataToSQL, json.Geo.Lat, json.Geo.Lng)
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
-go
-	c.JSON(200, res)
+	go c.JSON(200, res)
 }
 
+//DeleteCitySQL delete city by id from SQL database (havnt worked perfectly yet)
 func DeleteCitySQL(c *gin.Context) {
 
 	CityID := c.Query("id")
@@ -226,6 +222,7 @@ func DeleteCitySQL(c *gin.Context) {
 	c.JSON(200, res)
 }
 
+// GetCityByIDSQL find every info from sql db about city by id
 func GetCityByIDSQL(c *gin.Context) {
 	id := c.Params.ByName("id")
 	idConvertToInt, _ := strconv.ParseInt(id, 10, 64)
@@ -242,30 +239,25 @@ func GetCityByIDSQL(c *gin.Context) {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
 
-	type SQLCityInfo struct {
-		InfoID int    `json:"id"`
-		CityID int    `json:"cityId"`
-		Date   string `json:"Date"`
-		Temp   string `json:"Temp"`
-		Rain   string `json:"Rain"`
-	}
-
-	var cities []SQLCityInfo
-
+	var cities []cityStructs.CityData
 	for rows.Next() {
+
 		var InfoID int
 		var CityID int
-		var Date string
+		var Date int
 		var Temp string
 		var Rain string
+		var Latitude float64
+		var Longitude float64
 
-		rows.Scan(&InfoID, &CityID, &Date, &Temp, &Rain)
-		cities = append(cities, SQLCityInfo{InfoID, CityID, Date, Temp, Rain})
+		rows.Scan(&InfoID, &CityID, &Date, &Temp, &Rain, &Latitude, &Longitude)
+		// add every row to cities
+		cities = append(cities, cityStructs.CityData{CityID, InfoID, Date, Temp, Rain, Latitude, Longitude})
 	}
 	c.JSON(200, cities)
 }
 
-
+// GetExpectedForecastSQL makes forecast for exact place
 func GetExpectedForecastSQL(c *gin.Context) {
 	var wg sync.WaitGroup
 	if len(CityDatabase) == 0 {
@@ -279,23 +271,20 @@ func GetExpectedForecastSQL(c *gin.Context) {
 	lng := c.Query("lng")
 	timestamp := c.Query("timestamp")
 
-	// TODO Hiba ellenőrzéskor értelmes hibaüzenetet szeretnénk adni pontosan arról ami citiesDistance hibát okozta (ready)
-
-	var dataDoenstExistsMessage string
+	var dataDoesntExistsMessage string
 
 	if lat == "" {
-		dataDoenstExistsMessage += "lat data must be exists, "
+		dataDoesntExistsMessage += "lat data must be exists, "
 	}
 	if lng == "" {
-		dataDoenstExistsMessage += "lng data must be exists, "
+		dataDoesntExistsMessage += "lng data must be exists, "
 	}
 	if timestamp == "" {
-		dataDoenstExistsMessage += "timestamp data must be exists"
+		dataDoesntExistsMessage += "timestamp data must be exists"
 	}
-	if len(dataDoenstExistsMessage) > 0 {
-		content := gin.H{"error_message": dataDoenstExistsMessage}
+	if len(dataDoesntExistsMessage) > 0 {
+		content := gin.H{"error_message": dataDoesntExistsMessage}
 		c.JSON(400, content)
-		// TODO itt érdemes lenne egy return, hogy ne folytassuk citiesDistance futást ha hiba volt  (ready)
 		return
 	}
 
@@ -320,14 +309,12 @@ func GetExpectedForecastSQL(c *gin.Context) {
 	if len(convertProblem) > 0 {
 		content := gin.H{"error_message ": convertProblem}
 		c.JSON(400, content)
-		// TODO itt érdemes lenne egy return, hogy ne folytassuk citiesDistance futást ha hiba volt  (ready)
 		return
 	}
 
 	if timestampConvertToInt < 0 {
 		content := gin.H{"error_message ": "timestamp should be bigger than 0"}
 		c.JSON(400, content)
-		// TODO itt érdemes lenne egy return, hogy ne folytassuk citiesDistance futást ha hiba volt  (ready)
 		return
 	}
 
@@ -344,11 +331,9 @@ func GetExpectedForecastSQL(c *gin.Context) {
 	// count all distance with channels
 	//citiesDistance := DistanceCounter(ProcessorNumber, presentData, CitiesDataConvertToMap)
 
-
 	// balanced the distances
 	balancedDistance := BalancedDistanceByLinearInterpolation(citiesDistance)
 	// counting temps and raining data for next 5 days
-	// Todo csatornaval
 	wg.Add(2)
 	var forecastRain []float64
 	var forecastCelsius []float64
@@ -357,7 +342,7 @@ func GetExpectedForecastSQL(c *gin.Context) {
 	wg.Wait()
 
 	// send data
-	content := gin.H{"expected celsius next 5 days": forecastCelsius, "expected raining chance next 5 days":forecastRain}
+	content := gin.H{"expected celsius next 5 days": forecastCelsius, "expected raining chance next 5 days": forecastRain}
 	c.JSON(200, content)
 
 }
@@ -399,16 +384,12 @@ func GetCityByName(c *gin.Context) {
 	// response when city exist in our db
 	c.JSON(200, gin.H{"filteredCitiesByTime": filteredCitiesByTime})
 	return
-
-	// TODO érdemes lenne mindkét if ágban egy return, hogy ide ne juthassunk el. (ready)
-	// Ha itt bármilyen kód lenne független attól hogy not found volt e lefutna!
 }
-
-// TODO ennek a fügvénynek a neve nem tükrözi hogy valójában mit csinál  (ready)
 
 //GetExpectedForecast count the expected celsius and raining change for next five days
 func GetExpectedForecast(c *gin.Context) {
 	var wg sync.WaitGroup
+
 	if len(CityDatabase) == 0 {
 		content := gin.H{"response": "sry we havnt had enough data for calculating yet"}
 		c.JSON(200, content)
@@ -419,8 +400,6 @@ func GetExpectedForecast(c *gin.Context) {
 	lat := c.Query("lat")
 	lng := c.Query("lng")
 	timestamp := c.Query("timestamp")
-
-	// TODO Hiba ellenőrzéskor értelmes hibaüzenetet szeretnénk adni pontosan arról ami citiesDistance hibát okozta (ready)
 
 	var dataDoesntExistsMessage string
 
@@ -436,7 +415,6 @@ func GetExpectedForecast(c *gin.Context) {
 	if len(dataDoesntExistsMessage) > 0 {
 		content := gin.H{"error_message": dataDoesntExistsMessage}
 		c.JSON(400, content)
-		// TODO itt érdemes lenne egy return, hogy ne folytassuk citiesDistance futást ha hiba volt  (ready)
 		return
 	}
 
@@ -461,7 +439,6 @@ func GetExpectedForecast(c *gin.Context) {
 	if len(convertProblem) > 0 {
 		content := gin.H{"error_message ": convertProblem}
 		c.JSON(400, content)
-		// TODO itt érdemes lenne egy return, hogy ne folytassuk citiesDistance futást ha hiba volt  (ready)
 		return
 	}
 
@@ -472,14 +449,6 @@ func GetExpectedForecast(c *gin.Context) {
 		return
 	}
 
-	//put data to struct
-	// TODO a fenti parsolások mindegyikénél előfordulhat hiba, amit így teljesen figyelmen kívűl hagyunk (ready)
-	// TODO a fentabbi ellenőrzési szisztémával adhatunk hibaüzenetet hogy melyikből nem sikerült számot kinyernünk. (ready)  (timestampnel minuszt nem fogadunk el -- Ricsi)
-	// + Ellenőrizhető hogy citiesDistance szám valós tartományban van e.
-	// hiba esetén itt se menjünk tovább.
-
-
-
 	// data from the URL
 	presentData := cityStructs.CoordinateAndTime{latitudeConvertToFloat64, longitudeConvertToFloat64, timestampConvertToInt}
 
@@ -489,13 +458,10 @@ func GetExpectedForecast(c *gin.Context) {
 	// count all distance with channels
 	citiesDistance := DistanceCounter(ProcessorNumber, presentData, filteredCitiesbyTime)
 
-	// count all distances
-	//distances := CountDistance(presentData, filteredCitiesbyTime)
-
 	// balanced the distances
 	balancedDistance := BalancedDistanceByLinearInterpolation(citiesDistance)
 	// counting temps and raining data for next 5 days
-	// Todo csatornaval
+
 	wg.Add(2)
 	var forecastRain []float64
 	var forecastCelsius []float64
@@ -542,7 +508,6 @@ func BalancedDistanceByLinearInterpolation(distances map[string]float64) (balanc
 		// overwrite distance with balanced distance
 		distances[i] = balanceNumber
 	}
-
 	return distances
 }
 
@@ -591,14 +556,10 @@ func CalculateTemp(balancedCityDistance map[string]float64, cityInfo map[string]
 		truncated := float64(int(untruncated*100)) / 100
 		// put data to container
 		*ForecastTemps = append(*ForecastTemps, truncated)
-
 	}
 	databaseWaitGroup.Done()
 }
 
-// TODO az alábbi 3 fügvényt a tructok mellett tárolnám hogy (ready)
-// egyben látszódjon egy egy adattípusról, hogy mik az elemei és mik a rá definiált fugvények  (?)
-// order Cities by Timestamp
 func (slice CitiesInfo) Len() int {
 	return len(slice)
 }
@@ -635,12 +596,8 @@ func PostCity(c *gin.Context) {
 	c.JSON(201, content)
 }
 
-// TODO használjunk visszatérési érték változónevet is. (ready)
-
 // NearestCityDataInTime is a filter where we get back just one city (exm if we have 3 becs back just one) which is the most relevant by time
 func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (filteredCities map[string]cityStructs.CityInfo) {
-	// TODO én MAP ez használnék ahol a város neve a kulcs  (ready)
-	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
 
 	citiesDistance := make(map[string]cityStructs.CityInfo)
 
@@ -663,9 +620,8 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 	return citiesDistance
 }
 
-func CitiesFromSQL(timestamp int64) (filteredCities map[string]cityStructs.CityData){
-	// TODO én MAP ez használnék ahol a város neve a kulcs  (ready)
-	// és mindenhol az érték felülírása akkor történhet meg ha az infó frissebb.
+//CitiesFromSQL make a query to database for cities
+func CitiesFromSQL(timestamp int64) (filteredCities map[string]cityStructs.CityData) {
 
 	// open SQL
 	db, err := sql.Open("mysql", "root:admin@/GoCities")
@@ -675,69 +631,61 @@ func CitiesFromSQL(timestamp int64) (filteredCities map[string]cityStructs.CityD
 
 	defer db.Close()
 
-	rows, err := db.Query("select CityId,Any_Value(InfoId),Any_Value(Date),Any_value(Latitude),Any_value(Longitude),Any_value(Temp),Any_value(Rain) from CityInfo")
-	//rows, err := db.Query("select CityId,Any_Value(InfoId),Any_Value(Date),Any_Value(Latitude) from CityInfo GROUP BY CityId")
+	rows, err := db.Query("select * from CityInfo")
+
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
 
+	// container of cities
 	var cities []cityStructs.CityData
 
 	for rows.Next() {
 
+		var InfoID int
 		var CityID int
-		var InfoId int
 		var Date int
+		var Temp string
+		var Rain string
 		var Latitude float64
 		var Longitude float64
-		var Temp string
-	    var Rain string
 
-		rows.Scan(&CityID, &InfoId, &Date,&Latitude,&Longitude,&Temp,&Rain)
-		cities = append(cities, cityStructs.CityData{CityID, InfoId, Date, Latitude, Longitude, Temp, Rain})
+		rows.Scan(&InfoID, &CityID, &Date, &Temp, &Rain, &Latitude, &Longitude)
+		// add every row to cities
+		cities = append(cities, cityStructs.CityData{CityID, InfoID, Date, Temp, Rain, Latitude, Longitude})
+
 	}
 
-	citiesDistance := make(map[string]cityStructs.CityData)
+	filteredCitiesbyDistance := make(map[string]cityStructs.CityData)
 	timestampToInt := int(timestamp)
 
-
-
 	for _, v := range cities {
-		s := strconv.Itoa(v.CityID)
-		var oldDataCityDistanceTime int
-		var cityDistanceTimestamp = int(citiesDistance[s].Date)
-		oldDataCityDistanceTime = cityDistanceTimestamp - timestampToInt
+
+		cityID := strconv.Itoa(v.CityID)
+
+		var cityDistanceTimestamp = int(filteredCitiesbyDistance[cityID].Date)
+
+		oldDataCityDistanceTime := cityDistanceTimestamp - timestampToInt
 		if oldDataCityDistanceTime < 0 {
 			oldDataCityDistanceTime *= -1
 		}
-	var newDataCityDistanceTime int
-		newDataCityDistanceTime = v.Date - timestampToInt
+
+		newDataCityDistanceTime := v.Date - timestampToInt
 		if newDataCityDistanceTime < 0 {
 			newDataCityDistanceTime *= -1
 		}
 
-		if oldDataCityDistanceTime > newDataCityDistanceTime || citiesDistance[s].Date == 0 {
-			citiesDistance[s] = v
+		if oldDataCityDistanceTime > newDataCityDistanceTime || filteredCitiesbyDistance[cityID].Date == 0 {
+			filteredCitiesbyDistance[cityID] = v
 		}
 	}
-
-	return citiesDistance
-
+	return filteredCitiesbyDistance
 }
-
-
-//Todo pointer helyett channeleket irj,
-//Todo 1. feldolgozo Process ( StartDatabaseWritingNode)
-//Todo 2. feldolgozando elemeket tartalmazo csatorna letrehozasa
-// Todo 3. response elemeket tartalmazo csatorna letrehozasa
-//Todo 4.   eleinditasz barmennyit
-// Todo 5. ciklus ami a valaszcsatornat dolgozza fel
 
 // DistanceCounter where we count every city's distance from an exact place
 func DistanceCounter(ProcessorNumber int, coordinate cityStructs.CoordinateAndTime, filteredCities map[string]cityStructs.CityInfo) (distanceCities map[string]float64) {
 
 	var wg sync.WaitGroup
-
 
 	// because of the append we need to declare here by make
 	result := make(map[string]float64)
@@ -780,8 +728,6 @@ func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs
 		case cityInfo := <-in:
 			defer wg.Done()
 			// count distance
-
-
 			latitudeDistance := coordinate.Lat - cityInfo.Geo.Lat
 			longitudeDistance := coordinate.Lng - cityInfo.Geo.Lng
 			distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
@@ -794,46 +740,47 @@ func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs
 	}
 }
 
-// necesseary to not send back map because
-// if one goroutine is writing to a map, no other goroutine should be reading or writing the map concurrently. If the runtime detects this condition, it prints a diagnosis and crashes the program. (https://golang.org/doc/go1.6#runtime)
+//Out is necessary to not send back map because, if one goroutine is writing to a map, no other goroutine should be reading or writing the map concurrently. If the runtime detects this condition, it prints a diagnosis and crashes the program. (https://golang.org/doc/go1.6#runtime)
 type Out struct {
 	CityName string
 	Distance float64
 }
 
-func DataToMap(a map[string]cityStructs.CityData)(filteredCities_k map[string]cityStructs.CityInfo){
-
+//DataToMap change sql data format
+func DataToMap(filteredCitiesFromSQLDb map[string]cityStructs.CityData) (filteredCitiesResult map[string]cityStructs.CityInfo) {
 
 	filteredCities := make(map[string]cityStructs.CityInfo)
 
-	for _,v:= range a{
-		cityName := strconv.Itoa(v.CityID)
+	for _, v := range filteredCitiesFromSQLDb {
 
-		stringSliceTemp := strings.SplitN(v.Temp, ",",5)
-		stringSliceRain := strings.SplitN(v.Rain, ",",5)
+		// cityID is a unique data, --> use for key value
+		// convert int to string
+		cityID := strconv.Itoa(v.CityID)
+
+		// Rain and Temp data is in a string first split up,
+		stringSliceTemp := strings.SplitN(v.Temp, ",", 5)
+		stringSliceRain := strings.SplitN(v.Rain, ",", 5)
 
 		var stringToFloatTemp = [5]float64{}
 		var stringToFloatRain = [5]float64{}
 
-		for i,v := range stringSliceTemp{
-
-			f,_ := strconv.ParseFloat(v, 64)
+		// convert Temp data to float and put into array
+		for i, v := range stringSliceTemp {
+			f, _ := strconv.ParseFloat(v, 64)
 			stringToFloatTemp[i] = f
 		}
-
-		for i,v := range stringSliceRain{
-
-			f,_ := strconv.ParseFloat(v, 64)
+		// convert Rain data to float and put into array
+		for i, v := range stringSliceRain {
+			f, _ := strconv.ParseFloat(v, 64)
 			stringToFloatRain[i] = f
 		}
-
+		// cut off Geo data to decimal
 		truncatedLatitude := float64(int(v.Latitude*100)) / 100
 		truncatedLongtitude := float64(int(v.Longitude*100)) / 100
 
 		date := int64(v.Date)
 
-		filteredCities[cityName] = cityStructs.CityInfo{cityName, cityStructs.Geo{truncatedLatitude, truncatedLongtitude}, stringToFloatTemp, stringToFloatRain,date }
+		filteredCities[cityID] = cityStructs.CityInfo{cityID, cityStructs.Geo{truncatedLatitude, truncatedLongtitude}, stringToFloatTemp, stringToFloatRain, date}
 	}
-
 	return filteredCities
 }
