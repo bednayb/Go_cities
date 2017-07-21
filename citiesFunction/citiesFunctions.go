@@ -103,6 +103,17 @@ func PostCitySQL(c *gin.Context) {
 	var json cityStructs.CityInfo
 	c.Bind(&json) // This will infer what binder to use depending on the content-type header.
 
+
+	// checking rain data
+	for _, v := range json.Rain {
+		if v < 0 || v > 1 {
+			c.JSON(400, gin.H{
+				"result": "Failed, invalid Rain data (should be beetween 0 and 1)",
+			})
+			return
+		}
+	}
+
 	// open the database
 	db, err := sql.Open("mysql", "root:admin@/GoCities")
 	if err != nil {
@@ -183,8 +194,12 @@ func DeleteCitySQL(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// delete
-	stmt, err := db.Prepare("DELETE FROM City WHERE ID=?")
+	// delete (delete city's info)
+	stmt, err := db.Prepare("DELETE CityInfo FROM City INNER JOIN CityInfo WHERE CityId=? AND City.ID = CityInfo.CityId" )
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+	//stmt, err = db.Prepare("DELETE FROM City WHERE ID=?" )
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
