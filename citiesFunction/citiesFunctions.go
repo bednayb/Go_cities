@@ -25,17 +25,8 @@ type CitiesInfo []cityStructs.CityInfo
 // CityDatabase is collection of cities
 var CityDatabase CitiesInfo
 
-// Configuration file structure
-type Configuration struct {
-	Type            string
-	Database        string
-	ProcessorNumber int
-}
-
 // ProcessorNumber declaration
 var ProcessorNumber int
-
-var db *sql.DB
 
 //ConfigSettings here you can choose which settings file will be used (default is development)
 func ConfigSettings(configFile *string) {
@@ -57,7 +48,7 @@ func Init(configFile string) {
 
 	file, _ := os.Open("./config/" + configFile + ".json")
 	decoder := json.NewDecoder(file)
-	configuration := Configuration{}
+	configuration := cityStructs.Configuration{}
 	err := decoder.Decode(&configuration)
 	if err != nil {
 		fmt.Println("error:", err)
@@ -77,7 +68,6 @@ func Init(configFile string) {
 	default:
 		for i := 0; i < len(mockDatabase.Cities); i++ {
 			CityDatabase = append(CityDatabase, mockDatabase.Cities[i])
-
 		}
 	}
 }
@@ -94,19 +84,14 @@ func GetAllCitySQL(c *gin.Context) {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
 
-	type City struct {
-		CityID   int    `json:"id"`
-		CityName string `json:"cityName"`
-	}
-
-	var cities []City
+	var cities []cityStructs.CityBasicData
 
 	for rows.Next() {
 		var CityID int
 		var CityName string
 
 		rows.Scan(&CityID, &CityName)
-		cities = append(cities, City{CityID, CityName})
+		cities = append(cities, cityStructs.CityBasicData{CityID, CityName})
 	}
 
 	c.JSON(200, cities)
@@ -252,7 +237,7 @@ func GetCityByIDSQL(c *gin.Context) {
 
 		rows.Scan(&InfoID, &CityID, &Date, &Temp, &Rain, &Latitude, &Longitude)
 		// add every row to cities
-		cities = append(cities, cityStructs.CityData{CityID, InfoID, Date, Temp, Rain, Latitude, Longitude})
+		cities = append(cities, cityStructs.CityData{CityID, InfoID, Date, Temp, Rain, cityStructs.Geo{Latitude, Longitude}})
 	}
 	c.JSON(200, cities)
 }
@@ -271,17 +256,8 @@ func GetExpectedForecastSQL(c *gin.Context) {
 	lng := c.Query("lng")
 	timestamp := c.Query("timestamp")
 
-	var dataDoesntExistsMessage string
+	dataDoesntExistsMessage := checkDataExist(lat, lng, timestamp)
 
-	if lat == "" {
-		dataDoesntExistsMessage += "lat data must be exists, "
-	}
-	if lng == "" {
-		dataDoesntExistsMessage += "lng data must be exists, "
-	}
-	if timestamp == "" {
-		dataDoesntExistsMessage += "timestamp data must be exists"
-	}
 	if len(dataDoesntExistsMessage) > 0 {
 		content := gin.H{"error_message": dataDoesntExistsMessage}
 		c.JSON(400, content)
@@ -289,22 +265,12 @@ func GetExpectedForecastSQL(c *gin.Context) {
 	}
 
 	//Convert to float64/int
-	var convertProblem string
 	latitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
-
-	if lat != "0" && latitudeConvertToFloat64 == 0 {
-		convertProblem += "invalid lat data (not number), "
-	}
-
 	longitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
-	if lat != "0" && longitudeConvertToFloat64 == 0 {
-		convertProblem += "invalid lng data (not number), "
-	}
-
 	timestampConvertToInt, _ := strconv.ParseInt(timestamp, 10, 64)
-	if lat != "0" && timestampConvertToInt == 0 {
-		convertProblem += "invalid timestamp data (not number) "
-	}
+
+	// check converting
+	convertProblem := checkConverting(lat, latitudeConvertToFloat64, lng, longitudeConvertToFloat64, timestamp, timestampConvertToInt)
 
 	if len(convertProblem) > 0 {
 		content := gin.H{"error_message ": convertProblem}
@@ -312,7 +278,8 @@ func GetExpectedForecastSQL(c *gin.Context) {
 		return
 	}
 
-	if timestampConvertToInt < 0 {
+	// timestamp should be bigger than 0
+	if timestampConvertToInt <= 0 {
 		content := gin.H{"error_message ": "timestamp should be bigger than 0"}
 		c.JSON(400, content)
 		return
@@ -322,14 +289,13 @@ func GetExpectedForecastSQL(c *gin.Context) {
 	presentData := cityStructs.CoordinateAndTime{latitudeConvertToFloat64, longitudeConvertToFloat64, timestampConvertToInt}
 
 	//filtered Cities
-	cities := CitiesFromSQL(timestampConvertToInt)
+	cities := CitiesFromSQL()
 
-	CitiesDataConvertToMap := DataToMap(cities)
+	filteredCitiesbyTime := filteredCitiesByTime(cities, timestampConvertToInt)
+
+	CitiesDataConvertToMap := CitiesDataConvertToMap(filteredCitiesbyTime)
 
 	citiesDistance := DistanceCounter(ProcessorNumber, presentData, CitiesDataConvertToMap)
-
-	// count all distance with channels
-	//citiesDistance := DistanceCounter(ProcessorNumber, presentData, CitiesDataConvertToMap)
 
 	// balanced the distances
 	balancedDistance := BalancedDistanceByLinearInterpolation(citiesDistance)
@@ -389,7 +355,6 @@ func GetCityByName(c *gin.Context) {
 //GetExpectedForecast count the expected celsius and raining change for next five days
 func GetExpectedForecast(c *gin.Context) {
 	var wg sync.WaitGroup
-
 	if len(CityDatabase) == 0 {
 		content := gin.H{"response": "sry we havnt had enough data for calculating yet"}
 		c.JSON(200, content)
@@ -401,17 +366,8 @@ func GetExpectedForecast(c *gin.Context) {
 	lng := c.Query("lng")
 	timestamp := c.Query("timestamp")
 
-	var dataDoesntExistsMessage string
+	dataDoesntExistsMessage := checkDataExist(lat, lng, timestamp)
 
-	if lat == "" {
-		dataDoesntExistsMessage += "lat data must be exists, "
-	}
-	if lng == "" {
-		dataDoesntExistsMessage += "lng data must be exists, "
-	}
-	if timestamp == "" {
-		dataDoesntExistsMessage += "timestamp data must be exists"
-	}
 	if len(dataDoesntExistsMessage) > 0 {
 		content := gin.H{"error_message": dataDoesntExistsMessage}
 		c.JSON(400, content)
@@ -419,22 +375,12 @@ func GetExpectedForecast(c *gin.Context) {
 	}
 
 	//Convert to float64/int
-	var convertProblem string
+
 	latitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
-
-	if lat != "0" && latitudeConvertToFloat64 == 0 {
-		convertProblem += "invalid lat data (not number), "
-	}
-
 	longitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
-	if lat != "0" && longitudeConvertToFloat64 == 0 {
-		convertProblem += "invalid lng data (not number), "
-	}
-
 	timestampConvertToInt, _ := strconv.ParseInt(timestamp, 10, 64)
-	if lat != "0" && timestampConvertToInt == 0 {
-		convertProblem += "invalid timestamp data (not number) "
-	}
+
+	convertProblem := checkConverting(lat, latitudeConvertToFloat64, lng, longitudeConvertToFloat64, timestamp, timestampConvertToInt)
 
 	if len(convertProblem) > 0 {
 		content := gin.H{"error_message ": convertProblem}
@@ -442,10 +388,9 @@ func GetExpectedForecast(c *gin.Context) {
 		return
 	}
 
-	if timestampConvertToInt < 0 {
+	if timestampConvertToInt <= 0 {
 		content := gin.H{"error_message ": "timestamp should be bigger than 0"}
 		c.JSON(400, content)
-		// TODO itt érdemes lenne egy return, hogy ne folytassuk citiesDistance futást ha hiba volt  (ready)
 		return
 	}
 
@@ -453,20 +398,20 @@ func GetExpectedForecast(c *gin.Context) {
 	presentData := cityStructs.CoordinateAndTime{latitudeConvertToFloat64, longitudeConvertToFloat64, timestampConvertToInt}
 
 	// filter for the nearest data (by timestamp)
-	filteredCitiesbyTime := NearestCityDataInTime(CityDatabase, timestampConvertToInt)
+	filteredCitiesByTime := NearestCityDataInTime(CityDatabase, timestampConvertToInt)
 
 	// count all distance with channels
-	citiesDistance := DistanceCounter(ProcessorNumber, presentData, filteredCitiesbyTime)
+	citiesDistance := DistanceCounter(ProcessorNumber, presentData, filteredCitiesByTime)
 
 	// balanced the distances
-	balancedDistance := BalancedDistanceByLinearInterpolation(citiesDistance)
+	balancedDistanceByLinearInterpolation := BalancedDistanceByLinearInterpolation(citiesDistance)
 	// counting temps and raining data for next 5 days
 
 	wg.Add(2)
 	var forecastRain []float64
 	var forecastCelsius []float64
-	go CalculateRain(balancedDistance, filteredCitiesbyTime, &forecastRain, &wg)
-	go CalculateTemp(balancedDistance, filteredCitiesbyTime, &forecastCelsius, &wg)
+	go CalculateRain(balancedDistanceByLinearInterpolation, filteredCitiesByTime, &forecastRain, &wg)
+	go CalculateTemp(balancedDistanceByLinearInterpolation, filteredCitiesByTime, &forecastCelsius, &wg)
 	wg.Wait()
 
 	// send data
@@ -476,9 +421,6 @@ func GetExpectedForecast(c *gin.Context) {
 
 // BalancedDistanceByLinearInterpolation ponderare by linear interpolation (nearest 1 weight, furthest 0)
 func BalancedDistanceByLinearInterpolation(distances map[string]float64) (balanceByDistance map[string]float64) {
-
-	//  balanced distance
-	var balanceNumber float64
 
 	//// find furthest (biggest number)
 	var permanentBiggest float64
@@ -502,7 +444,7 @@ func BalancedDistanceByLinearInterpolation(distances map[string]float64) (balanc
 	}
 	// calculate balanced numbers
 	for i, v := range distances {
-		balanceNumber = (v - smallest) / (biggest - smallest)
+		balanceNumber := (v - smallest) / (biggest - smallest)
 		balanceNumber--
 		balanceNumber *= -1
 		// overwrite distance with balanced distance
@@ -533,7 +475,6 @@ func CalculateRain(balancedCityDistance map[string]float64, cityInfo map[string]
 		*ForecastRainingChance = append(*ForecastRainingChance, truncated)
 	}
 	databaseWaitGroup.Done()
-
 }
 
 //CalculateTemp where we count the expected Celsius chance for next five days
@@ -613,7 +554,7 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 			newDataCityDistanceTime *= -1
 		}
 
-		if oldDataCityDistanceTime > newDataCityDistanceTime || filteredCities[v.City].Timestamp == 0 {
+		if oldDataCityDistanceTime > newDataCityDistanceTime || citiesDistance[v.City].Timestamp == 0 {
 			citiesDistance[v.City] = v
 		}
 	}
@@ -621,7 +562,7 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 }
 
 //CitiesFromSQL make a query to database for cities
-func CitiesFromSQL(timestamp int64) (filteredCities map[string]cityStructs.CityData) {
+func CitiesFromSQL() (cities []cityStructs.CityData) {
 
 	// open SQL
 	db, err := sql.Open("mysql", "root:admin@/GoCities")
@@ -637,9 +578,6 @@ func CitiesFromSQL(timestamp int64) (filteredCities map[string]cityStructs.CityD
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
 
-	// container of cities
-	var cities []cityStructs.CityData
-
 	for rows.Next() {
 
 		var InfoID int
@@ -652,34 +590,10 @@ func CitiesFromSQL(timestamp int64) (filteredCities map[string]cityStructs.CityD
 
 		rows.Scan(&InfoID, &CityID, &Date, &Temp, &Rain, &Latitude, &Longitude)
 		// add every row to cities
-		cities = append(cities, cityStructs.CityData{CityID, InfoID, Date, Temp, Rain, Latitude, Longitude})
-
+		cities = append(cities, cityStructs.CityData{CityID, InfoID, Date, Temp, Rain, cityStructs.Geo{Latitude, Longitude}})
 	}
 
-	filteredCitiesbyDistance := make(map[string]cityStructs.CityData)
-	timestampToInt := int(timestamp)
-
-	for _, v := range cities {
-
-		cityID := strconv.Itoa(v.CityID)
-
-		var cityDistanceTimestamp = int(filteredCitiesbyDistance[cityID].Date)
-
-		oldDataCityDistanceTime := cityDistanceTimestamp - timestampToInt
-		if oldDataCityDistanceTime < 0 {
-			oldDataCityDistanceTime *= -1
-		}
-
-		newDataCityDistanceTime := v.Date - timestampToInt
-		if newDataCityDistanceTime < 0 {
-			newDataCityDistanceTime *= -1
-		}
-
-		if oldDataCityDistanceTime > newDataCityDistanceTime || filteredCitiesbyDistance[cityID].Date == 0 {
-			filteredCitiesbyDistance[cityID] = v
-		}
-	}
-	return filteredCitiesbyDistance
+	return cities
 }
 
 // DistanceCounter where we count every city's distance from an exact place
@@ -693,7 +607,7 @@ func DistanceCounter(ProcessorNumber int, coordinate cityStructs.CoordinateAndTi
 	///////Todo buffer annyi legyen mint ahany csatorna van (ready)
 	//make channel
 	in := make(chan cityStructs.CityInfo, len(filteredCities))
-	out := make(chan Out, len(filteredCities))
+	out := make(chan cityStructs.Out, len(filteredCities))
 
 	//////Todo megadhato proc szam (configbol) (ready)
 	//make processor
@@ -719,9 +633,7 @@ func DistanceCounter(ProcessorNumber int, coordinate cityStructs.CoordinateAndTi
 }
 
 //DistanceCounterProcess count the distances of city and send back to DistanceCounter
-func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs.CoordinateAndTime, out chan Out, wg *sync.WaitGroup) {
-
-	var distance float64
+func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs.CoordinateAndTime, out chan cityStructs.Out, wg *sync.WaitGroup) {
 
 	for {
 		select {
@@ -730,24 +642,18 @@ func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs
 			// count distance
 			latitudeDistance := coordinate.Lat - cityInfo.Geo.Lat
 			longitudeDistance := coordinate.Lng - cityInfo.Geo.Lng
-			distance = math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
+			distance := math.Sqrt(math.Pow(latitudeDistance, 2) + math.Pow(longitudeDistance, 2))
 
 			//response data Out type and make map just at other side because with map can be gorutine problems (see at type Out)
-			res := Out{cityInfo.City, distance}
+			res := cityStructs.Out{cityInfo.City, distance}
 			//send back
 			out <- res
 		}
 	}
 }
 
-//Out is necessary to not send back map because, if one goroutine is writing to a map, no other goroutine should be reading or writing the map concurrently. If the runtime detects this condition, it prints a diagnosis and crashes the program. (https://golang.org/doc/go1.6#runtime)
-type Out struct {
-	CityName string
-	Distance float64
-}
-
-//DataToMap change sql data format
-func DataToMap(filteredCitiesFromSQLDb map[string]cityStructs.CityData) (filteredCitiesResult map[string]cityStructs.CityInfo) {
+//CitiesDataConvertToMap change sql data format
+func CitiesDataConvertToMap(filteredCitiesFromSQLDb map[string]cityStructs.CityData) (filteredCitiesResult map[string]cityStructs.CityInfo) {
 
 	filteredCities := make(map[string]cityStructs.CityInfo)
 
@@ -775,12 +681,69 @@ func DataToMap(filteredCitiesFromSQLDb map[string]cityStructs.CityData) (filtere
 			stringToFloatRain[i] = f
 		}
 		// cut off Geo data to decimal
-		truncatedLatitude := float64(int(v.Latitude*100)) / 100
-		truncatedLongtitude := float64(int(v.Longitude*100)) / 100
+		truncatedLatitude := float64(int(v.Geo.Lat*100)) / 100
+		truncatedLongtitude := float64(int(v.Geo.Lng*100)) / 100
 
 		date := int64(v.Date)
 
 		filteredCities[cityID] = cityStructs.CityInfo{cityID, cityStructs.Geo{truncatedLatitude, truncatedLongtitude}, stringToFloatTemp, stringToFloatRain, date}
 	}
 	return filteredCities
+}
+
+func checkDataExist(lat string, lng string, timestamp string) (dataDoesntExistsMessage string) {
+
+	if lat == "" {
+		dataDoesntExistsMessage += "lat data must be exists, "
+	}
+	if lng == "" {
+		dataDoesntExistsMessage += "lng data must be exists, "
+	}
+	if timestamp == "" {
+		dataDoesntExistsMessage += "timestamp data must be exists"
+	}
+	return dataDoesntExistsMessage
+}
+
+func checkConverting(lat string, latitudeConvertToFloat64 float64, lng string, longitudeConvertToFloat64 float64, timestamp string, timestampConvertToInt int64) (convertProblem string) {
+
+	if lat != "0" && latitudeConvertToFloat64 == 0 {
+		convertProblem += "invalid lat data (not number), "
+	}
+
+	if lng != "0" && longitudeConvertToFloat64 == 0 {
+		convertProblem += "invalid lng data (not number), "
+	}
+
+	if timestamp != "0" && timestampConvertToInt == 0 {
+		convertProblem += "invalid timestamp data (not number) "
+	}
+	return convertProblem
+}
+
+func filteredCitiesByTime(cities []cityStructs.CityData, timestamp int64) (result map[string]cityStructs.CityData) {
+	filteredCitiesbyDistance := make(map[string]cityStructs.CityData)
+	timestampToInt := int(timestamp)
+
+	for _, v := range cities {
+
+		cityID := strconv.Itoa(v.CityID)
+
+		var cityDistanceTimestamp = int(filteredCitiesbyDistance[cityID].Date)
+
+		oldDataCityDistanceTime := cityDistanceTimestamp - timestampToInt
+		if oldDataCityDistanceTime < 0 {
+			oldDataCityDistanceTime *= -1
+		}
+
+		newDataCityDistanceTime := v.Date - timestampToInt
+		if newDataCityDistanceTime < 0 {
+			newDataCityDistanceTime *= -1
+		}
+
+		if oldDataCityDistanceTime > newDataCityDistanceTime || filteredCitiesbyDistance[cityID].Date == 0 {
+			filteredCitiesbyDistance[cityID] = v
+		}
+	}
+	return filteredCitiesbyDistance
 }
