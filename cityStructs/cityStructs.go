@@ -27,9 +27,9 @@ type Geo struct {
 
 // CityData  contains cityInfo data from slq db
 type CityData struct {
-	CityID    int
+	CityID    int  `json:"City"`
 	InfoID    int
-	Date      int
+	Date      int	`json:"Timestamp"`
 	Temp      string
 	Rain      string
 	Geo 		Geo
@@ -46,7 +46,6 @@ type Configuration struct {
 	Database        string
 	ProcessorNumber int
 }
-
 
 //Out is necessary to not send back map because, if one goroutine is writing to a map, no other goroutine should be reading or writing the map concurrently. If the runtime detects this condition, it prints a diagnosis and crashes the program. (https://golang.org/doc/go1.6#runtime)
 type Out struct {
