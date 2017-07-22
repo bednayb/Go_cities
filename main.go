@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/viper"
 	"log"
 	"fmt"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 func main() {
@@ -13,6 +15,7 @@ func main() {
 	// if you want to use mock data  run go run main.go -config development (or just go run main.go)
 	// if you want to use test data  run go run main.go -config test
 	// if you want to use production data  run go run main.go -config production
+	// if you want to use sql database  run go run main.go -config production mysql
 
 	var configFile string
 	citiesFunction.ConfigSettings(&configFile)
@@ -28,25 +31,49 @@ func main() {
 	// Confirm which config file is used
 	fmt.Printf("Using config: %s\n", viper.ConfigFileUsed())
 
-	//if !viper.IsSet(configFile +".database") {
-	//	log.Fatal("missing database")
-	//}
-
 	//Settings data
 	citiesFunction.Init(configFile)
+
+	viper.WatchConfig()
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		fmt.Println("Config file changed:", e.Name)
+
+		// Find and read the config file
+		if err := viper.ReadInConfig(); err != nil {
+			log.Fatalf("Error reading config file, %s", err)
+		}
+
+		// Confirm which config file is used
+		fmt.Printf("Using config: %s\n", viper.ConfigFileUsed())
+
+		//Settings data
+		citiesFunction.Init(configFile)
+	})
 
 	r := gin.Default()
 	v1 := r.Group("/")
 	{
-		// list all cities
-		v1.GET("/cities", citiesFunction.GetAllCity)
-		// find specific city by name
-		v1.GET("/city/:name", citiesFunction.GetCityByName)
-		// make forecast for exact place
-		v1.GET("/avg", citiesFunction.GetExpectedForecast)
-		// add new city
-		v1.POST("/push", citiesFunction.PostCity)
-	}
 
+			// list all cities
+			v1.GET("/mock/cities", citiesFunction.GetAllCity)
+			// find specific city by name
+			v1.GET("/mock/city/:name", citiesFunction.GetCityByName)
+			// make forecast for exact place
+			v1.GET("/mock/avg", citiesFunction.GetExpectedForecast)
+			// add new city
+			v1.POST("/mock/push", citiesFunction.PostCity)
+
+			// list all cities SQL
+			v1.GET("/sql/cities", citiesFunction.GetAllCitySQL)
+			// find specific city by name
+			v1.GET("/sql/city/:id", citiesFunction.GetCityByIDSQL)
+			// add new city SQL
+			v1.POST("/sql/push", citiesFunction.PostCitySQL)
+			// make forecast for exact place
+			v1.GET("/sql/avg", citiesFunction.GetExpectedForecastSQL)
+			// add new city SQL
+			v1.DELETE("/sql/delete", citiesFunction.DeleteCitySQL)
+
+	}
 	r.Run(":8080")
 }
