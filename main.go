@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/viper"
 	"log"
 	"fmt"
-
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -53,27 +52,17 @@ func main() {
 	r := gin.Default()
 	v1 := r.Group("/")
 	{
+		// list all cities
+		v1.GET("/v1/cities", citiesFunction.GetAllCity)
+		// make forecast for exact place
+		v1.GET("/v1/avg", citiesFunction.GetExpectedForecast)
+		// find specific city by name
+		v1.GET("/v1/city/:name", citiesFunction.GetCityByName)
+		// add new city
+		v1.POST("/v1/push", citiesFunction.PostCity)
 
-			// list all cities
-			v1.GET("/mock/cities", citiesFunction.GetAllCity)
-			// find specific city by name
-			v1.GET("/mock/city/:name", citiesFunction.GetCityByName)
-			// make forecast for exact place
-			v1.GET("/mock/avg", citiesFunction.GetExpectedForecast)
-			// add new city
-			v1.POST("/mock/push", citiesFunction.PostCity)
-
-			// list all cities SQL
-			v1.GET("/sql/cities", citiesFunction.GetAllCitySQL)
-			// find specific city by name
-			v1.GET("/sql/city/:id", citiesFunction.GetCityByIDSQL)
-			// add new city SQL
-			v1.POST("/sql/push", citiesFunction.PostCitySQL)
-			// make forecast for exact place
-			v1.GET("/sql/avg", citiesFunction.GetExpectedForecastSQL)
-			// add new city SQL
-			v1.DELETE("/sql/delete", citiesFunction.DeleteCitySQL)
-
+		// add new city SQL
+		v1.DELETE("/sql/delete", citiesFunction.DeleteCitySQL)
 	}
-	r.Run(":8080")
+	r.Run(":"+citiesFunction.Config.Port)
 }
