@@ -26,7 +26,7 @@ type CitiesInfo []cityStructs.CityInfo
 var CityDatabase CitiesInfo
 
 // ProcessorNumber declaration
-var ProcessorNumber int
+var Config cityStructs.Configuration
 
 //ConfigSettings here you can choose which settings file will be used (default is development)
 func ConfigSettings(configFile *string) {
@@ -54,7 +54,14 @@ func Init(configFile string) {
 		fmt.Println("error:", err)
 	}
 
-	ProcessorNumber = configuration.ProcessorNumber
+	Config.Type = configuration.Type
+	Config.MySQL = configuration.MySQL
+	Config.ProcessorNumber = configuration.ProcessorNumber
+	Config.Port = configuration.Port
+	Config.FilteringCityData = configuration.FilteringCityData
+	Config.Database = configuration.Database
+	Config.BalancedByDistance = configuration.BalancedByDistance
+	Config.FilteringCityData = configuration.FilteringCityData
 
 	switch configuration.Database {
 	case "productionDatabase":
@@ -73,113 +80,150 @@ func Init(configFile string) {
 }
 
 // GetAllCitySQL list all cities from SQL database
-func GetAllCitySQL(c *gin.Context) {
-	db, err := sql.Open("mysql", "root:admin@/GoCities")
-	if err != nil {
-		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+func GetAllCity(c *gin.Context) {
+
+	if Config.MySQL {
+
+		db, err := sql.Open("mysql", "root:admin@/GoCities")
+		if err != nil {
+			panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+		}
+		defer db.Close()
+		rows, err := db.Query("SELECT CityName,Latitude,Longitude,Temp,Rain,Date FROM City INNER JOIN CityInfo ON City.ID = CityInfo.CityID ")
+		if err != nil {
+			panic(err.Error()) // proper error handling instead of panic in your app
+		}
+
+		// cities container
+		var cities cityStructs.CitiesInfo
+
+		for rows.Next() {
+			var CityName string
+			var Latitude float64
+			var Longitude float64
+			var Temp string
+			var Rain string
+			var Date int64
+
+			rows.Scan(&CityName, &Latitude, &Longitude, &Temp, &Rain, &Date)
+
+			RainData := stringToFloatArray(Rain)
+			TempData := stringToFloatArray(Temp)
+
+			cities = append(cities, cityStructs.CityInfo{CityName, cityStructs.Geo{Latitude, Longitude}, TempData, RainData, Date})
+		}
+
+		c.JSON(200, cities)
+	} else {
+		cities := CityDatabase
+		c.JSON(200, cities)
 	}
-	defer db.Close()
-	rows, err := db.Query("SELECT * FROM City")
-	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-	}
-
-	var cities []cityStructs.CityBasicData
-
-	for rows.Next() {
-		var CityID int
-		var CityName string
-
-		rows.Scan(&CityID, &CityName)
-		cities = append(cities, cityStructs.CityBasicData{CityID, CityName})
-	}
-
-	c.JSON(200, cities)
 }
 
 // PostCitySQL add new city to SQL database
-func PostCitySQL(c *gin.Context) {
+func PostCity(c *gin.Context) {
+	if Config.MySQL {
+		var json cityStructs.CityInfo
+		c.Bind(&json) // This will infer what binder to use depending on the content-type header.
 
-	var json cityStructs.CityInfo
-	c.Bind(&json) // This will infer what binder to use depending on the content-type header.
-
-
-	// checking rain data
-	for _, v := range json.Rain {
-		if v < 0 || v > 1 {
-			c.JSON(400, gin.H{
-				"result": "Failed, invalid Rain data (should be beetween 0 and 1)",
-			})
-			return
+		// checking rain data
+		for _, v := range json.Rain {
+			if v < 0 || v > 1 {
+				c.JSON(400, gin.H{
+					"result": "Failed, invalid Rain data (should be beetween 0 and 1)",
+				})
+				return
+			}
 		}
-	}
 
-	// open the database
-	db, err := sql.Open("mysql", "root:admin@/GoCities")
-	if err != nil {
-		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
-	}
-	defer db.Close()
+		// open the database
+		db, err := sql.Open("mysql", "root:admin@/GoCities")
+		if err != nil {
+			panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+		}
+		defer db.Close()
 
-	// if city not exist the
-	var CheckCityID int
+		// if city not exist the
+		var CheckCityID int
 
-	db.QueryRow("SELECT ID FROM City WHERE CityName = ?", json.City).Scan(&CheckCityID)
+		db.QueryRow("SELECT ID FROM City WHERE CityName = ?", json.City).Scan(&CheckCityID)
 
-	// if city not exist in our DB,id == 0 and the new city will be saved
-	if CheckCityID == 0 {
-		stmt, err := db.Prepare("INSERT City SET CityName = ?")
+		// if city not exist in our DB,id == 0 and the new city will be saved
+		if CheckCityID == 0 {
+			stmt, err := db.Prepare("INSERT City SET CityName = ?")
+			if err != nil {
+				panic(err.Error()) // proper error handling instead of panic in your app
+			}
+
+			res, err := stmt.Exec(json.City)
+			if res == nil {
+				fmt.Println(res)
+			}
+			if err != nil {
+				panic(err.Error()) // proper error handling instead of panic in your app
+			}
+		}
+
+		// cityId for cityInfo
+		var cityID int
+		db.QueryRow("SELECT ID FROM City WHERE CityName = ?", json.City).Scan(&cityID)
+
+		// insert into Info
+		stmt, err := db.Prepare("INSERT CityInfo Set CityId =?,Date=?,Temp=?,Rain=?,Latitude=?,Longitude=?")
+
 		if err != nil {
 			panic(err.Error()) // proper error handling instead of panic in your app
 		}
 
-		res, err := stmt.Exec(json.City)
-		if res == nil {
-			fmt.Println(res)
+		tempData := json.Temp
+		var tempDataToSQL string
+		for i, v := range tempData {
+			s := strconv.FormatFloat(v, 'f', -1, 64)
+			if i != len(tempData)-1 {
+				tempDataToSQL += s + ","
+			} else {
+				tempDataToSQL += s
+			}
 		}
+
+		rainData := json.Rain
+		var rainDataToSQL string
+		for i, v := range rainData {
+			s := strconv.FormatFloat(v, 'f', -1, 64)
+			if i != len(tempData)-1 {
+				rainDataToSQL += s + ","
+			} else {
+				rainDataToSQL += s
+			}
+		}
+
+		res, err := stmt.Exec(cityID, json.Timestamp, tempDataToSQL, rainDataToSQL, json.Geo.Lat, json.Geo.Lng)
 		if err != nil {
 			panic(err.Error()) // proper error handling instead of panic in your app
 		}
-	}
 
-	// cityId for cityInfo
-	var cityID int
-	db.QueryRow("SELECT ID FROM City WHERE CityName = ?", json.City).Scan(&cityID)
+		go c.JSON(200, res)
+	} else {
+		var json cityStructs.CityInfo
+		c.Bind(&json) // This will infer what binder to use depending on the content-type header.
 
-	// insert into Info
-	stmt, err := db.Prepare("INSERT CityInfo Set CityId =?,Date=?,Temp=?,Rain=?,Latitude=?,Longitude=?")
-
-	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-	}
-
-	tempData := json.Temp
-	var tempDataToSQL string
-	for i, v := range tempData {
-		s := strconv.FormatFloat(v, 'f', -1, 64)
-		if i != len(tempData)-1 {
-			tempDataToSQL += s + ","
-		} else {
-			tempDataToSQL += s
+		// checking rain data
+		for _, v := range json.Rain {
+			if v < 0 || v > 1 {
+				c.JSON(400, gin.H{
+					"result": "Failed, invalid temp data (should be beetween 0 and 1)",
+				})
+				return
+			}
 		}
-	}
 
-	rainData := json.Rain
-	var rainDataToSQL string
-	for i, v := range rainData {
-		s := strconv.FormatFloat(v, 'f', -1, 64)
-		if i != len(tempData)-1 {
-			rainDataToSQL += s + ","
-		} else {
-			rainDataToSQL += s
+		CityDatabase = append(CityDatabase, json)
+
+		content := gin.H{
+			"result": "successful saving",
 		}
+		c.JSON(201, content)
 	}
-
-	res, err := stmt.Exec(cityID, json.Timestamp, tempDataToSQL, rainDataToSQL, json.Geo.Lat, json.Geo.Lng)
-	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-	}
-	go c.JSON(200, res)
 }
 
 //DeleteCitySQL delete city by id from SQL database (havnt worked perfectly yet)
@@ -195,7 +239,7 @@ func DeleteCitySQL(c *gin.Context) {
 	defer db.Close()
 
 	// delete (delete city's info)
-	stmt, err := db.Prepare("DELETE CityInfo FROM City INNER JOIN CityInfo WHERE CityId=? AND City.ID = CityInfo.CityId" )
+	stmt, err := db.Prepare("DELETE CityInfo FROM City INNER JOIN CityInfo WHERE CityId=? AND City.ID = CityInfo.CityId")
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
@@ -218,125 +262,45 @@ func DeleteCitySQL(c *gin.Context) {
 		c.JSON(200, "delete was successful")
 		return
 	}
-
 	c.JSON(200, res)
-}
-
-// GetCityByIDSQL find every info from sql db about city by id
-func GetCityByIDSQL(c *gin.Context) {
-	id := c.Params.ByName("id")
-	idConvertToInt, _ := strconv.ParseInt(id, 10, 64)
-
-	db, err := sql.Open("mysql", "root:admin@/GoCities")
-	if err != nil {
-		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
-	}
-
-	defer db.Close()
-
-	rows, err := db.Query("SELECT * FROM CityInfo WHERE CityId = ? ORDER BY DATE", idConvertToInt)
-	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-	}
-
-	var cities []cityStructs.CityData
-	for rows.Next() {
-
-		var InfoID int
-		var CityID int
-		var Date int
-		var Temp string
-		var Rain string
-		var Latitude float64
-		var Longitude float64
-
-		rows.Scan(&InfoID, &CityID, &Date, &Temp, &Rain, &Latitude, &Longitude)
-		// add every row to cities
-		cities = append(cities, cityStructs.CityData{CityID, InfoID, Date, Temp, Rain, cityStructs.Geo{Latitude, Longitude}})
-	}
-	c.JSON(200, cities)
-}
-
-// GetExpectedForecastSQL makes forecast for exact place
-func GetExpectedForecastSQL(c *gin.Context) {
-	var wg sync.WaitGroup
-	if len(CityDatabase) == 0 {
-		content := gin.H{"response": "sry we havnt had enough data for calculating yet"}
-		c.JSON(200, content)
-		return
-	}
-
-	// save data from URL
-	lat := c.Query("lat")
-	lng := c.Query("lng")
-	timestamp := c.Query("timestamp")
-
-	dataDoesntExistsMessage := checkDataExist(lat, lng, timestamp)
-
-	if len(dataDoesntExistsMessage) > 0 {
-		content := gin.H{"error_message": dataDoesntExistsMessage}
-		c.JSON(400, content)
-		return
-	}
-
-	//Convert to float64/int
-	latitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
-	longitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
-	timestampConvertToInt, _ := strconv.ParseInt(timestamp, 10, 64)
-
-	// check converting
-	convertProblem := checkConverting(lat, latitudeConvertToFloat64, lng, longitudeConvertToFloat64, timestamp, timestampConvertToInt)
-
-	if len(convertProblem) > 0 {
-		content := gin.H{"error_message ": convertProblem}
-		c.JSON(400, content)
-		return
-	}
-
-	// timestamp should be bigger than 0
-	if timestampConvertToInt <= 0 {
-		content := gin.H{"error_message ": "timestamp should be bigger than 0"}
-		c.JSON(400, content)
-		return
-	}
-
-	// data from the URL
-	presentData := cityStructs.CoordinateAndTime{latitudeConvertToFloat64, longitudeConvertToFloat64, timestampConvertToInt}
-
-	//filtered Cities
-	cities := CitiesFromSQL()
-
-	filteredCitiesbyTime := filteredCitiesByTime(cities, timestampConvertToInt)
-
-	CitiesDataConvertToMap := CitiesDataConvertToMap(filteredCitiesbyTime)
-
-	citiesDistance := DistanceCounter(ProcessorNumber, presentData, CitiesDataConvertToMap)
-
-	// balanced the distances
-	balancedDistance := BalancedDistanceByLinearInterpolation(citiesDistance)
-	// counting temps and raining data for next 5 days
-	wg.Add(2)
-	var forecastRain []float64
-	var forecastCelsius []float64
-	go CalculateRain(balancedDistance, CitiesDataConvertToMap, &forecastRain, &wg)
-	go CalculateTemp(balancedDistance, CitiesDataConvertToMap, &forecastCelsius, &wg)
-	wg.Wait()
-
-	// send data
-	content := gin.H{"expected celsius next 5 days": forecastCelsius, "expected raining chance next 5 days": forecastRain}
-	c.JSON(200, content)
-
-}
-
-// GetAllCity shows all cities
-func GetAllCity(c *gin.Context) {
-	cities := CityDatabase
-	c.JSON(200, cities)
 }
 
 // GetCityByName shows every data where the city name is same (example: becs)
 func GetCityByName(c *gin.Context) {
 
+	if Config.MySQL {
+		name := c.Params.ByName("name")
+
+		db, err := sql.Open("mysql", "root:admin@/GoCities")
+		if err != nil {
+			panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+		}
+		defer db.Close()
+		rows, err := db.Query("SELECT CityName,Latitude,Longitude,Temp,Rain,Date FROM City INNER JOIN CityInfo ON City.ID = CityInfo.CityID where CityName =? ORDER BY Date ", name)
+		if err != nil {
+			panic(err.Error()) // proper error handling instead of panic in your app
+		}
+
+		// cities container
+		var cities cityStructs.CitiesInfo
+
+		for rows.Next() {
+			var CityName string
+			var Latitude float64
+			var Longitude float64
+			var Temp string
+			var Rain string
+			var Date int64
+
+			rows.Scan(&CityName, &Latitude, &Longitude, &Temp, &Rain, &Date)
+
+			RainData := stringToFloatArray(Rain)
+			TempData := stringToFloatArray(Temp)
+
+			cities = append(cities, cityStructs.CityInfo{CityName, cityStructs.Geo{Latitude, Longitude}, TempData, RainData, Date})
+		}
+		c.JSON(200, cities)
+	}
 	cities := CityDatabase
 	// find city's name from url
 	name := c.Params.ByName("name")
@@ -390,7 +354,6 @@ func GetExpectedForecast(c *gin.Context) {
 	}
 
 	//Convert to float64/int
-
 	latitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lat), 64)
 	longitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
 	timestampConvertToInt, _ := strconv.ParseInt(timestamp, 10, 64)
@@ -412,21 +375,38 @@ func GetExpectedForecast(c *gin.Context) {
 	// data from the URL
 	presentData := cityStructs.CoordinateAndTime{latitudeConvertToFloat64, longitudeConvertToFloat64, timestampConvertToInt}
 
-	// filter for the nearest data (by timestamp)
-	filteredCitiesByTime := NearestCityDataInTime(CityDatabase, timestampConvertToInt)
+	var citiesDistance map[string]float64
+	var filteredCitiesByTimeForCalculate map[string]cityStructs.CityInfo
 
+	if Config.MySQL {
+		cities := CitiesFromSQL()
+
+		filteredCitiesByTimeNotMap := filteredCitiesByTime(cities, timestampConvertToInt)
+		filteredCitiesByTimeForCalculate = CitiesDataConvertToMap(filteredCitiesByTimeNotMap)
+
+	} else {
+		// filter for the nearest data (by timestamp)
+		filteredCitiesByTimeForCalculate = NearestCityDataInTime(CityDatabase, timestampConvertToInt)
+	}
 	// count all distance with channels
-	citiesDistance := DistanceCounter(ProcessorNumber, presentData, filteredCitiesByTime)
-
+	citiesDistance = DistanceCounter(Config.ProcessorNumber, presentData, filteredCitiesByTimeForCalculate)
 	// balanced the distances
-	balancedDistanceByLinearInterpolation := BalancedDistanceByLinearInterpolation(citiesDistance)
+	var balancedDistanceByLinearInterpolation map[string]float64
+
+	if Config.BalancedByDistance {
+
+		balancedDistanceByLinearInterpolation = BalancedDistanceByLinearInterpolation(citiesDistance)
+	} else {
+
+		balancedDistanceByLinearInterpolation = citiesDistance
+	}
 	// counting temps and raining data for next 5 days
 
 	wg.Add(2)
 	var forecastRain []float64
 	var forecastCelsius []float64
-	go CalculateRain(balancedDistanceByLinearInterpolation, filteredCitiesByTime, &forecastRain, &wg)
-	go CalculateTemp(balancedDistanceByLinearInterpolation, filteredCitiesByTime, &forecastCelsius, &wg)
+	go CalculateRain(balancedDistanceByLinearInterpolation, filteredCitiesByTimeForCalculate, &forecastRain, &wg)
+	go CalculateTemp(balancedDistanceByLinearInterpolation, filteredCitiesByTimeForCalculate, &forecastCelsius, &wg)
 	wg.Wait()
 
 	// send data
@@ -528,49 +508,33 @@ func (slice CitiesInfo) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-// PostCity saving new city
-func PostCity(c *gin.Context) {
-
-	var json cityStructs.CityInfo
-	c.Bind(&json) // This will infer what binder to use depending on the content-type header.
-
-	// checking rain data
-	for _, v := range json.Rain {
-		if v < 0 || v > 1 {
-			c.JSON(400, gin.H{
-				"result": "Failed, invalid temp data (should be beetween 0 and 1)",
-			})
-			return
-		}
-	}
-
-	CityDatabase = append(CityDatabase, json)
-
-	content := gin.H{
-		"result": "successful saving",
-	}
-	c.JSON(201, content)
-}
-
 // NearestCityDataInTime is a filter where we get back just one city (exm if we have 3 becs back just one) which is the most relevant by time
 func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (filteredCities map[string]cityStructs.CityInfo) {
 
 	citiesDistance := make(map[string]cityStructs.CityInfo)
+	makeDifferenceBetweenCities := 0
 
 	for _, v := range allCities {
 
-		oldDataCityDistanceTime := citiesDistance[v.City].Timestamp - timestamp
-		if oldDataCityDistanceTime < 0 {
-			oldDataCityDistanceTime *= -1
-		}
+		if Config.FilteringCityData {
+			oldDataCityDistanceTime := citiesDistance[v.City].Timestamp - timestamp
+			if oldDataCityDistanceTime < 0 {
+				oldDataCityDistanceTime *= -1
+			}
 
-		newDataCityDistanceTime := v.Timestamp - timestamp
-		if newDataCityDistanceTime < 0 {
-			newDataCityDistanceTime *= -1
-		}
+			newDataCityDistanceTime := v.Timestamp - timestamp
+			if newDataCityDistanceTime < 0 {
+				newDataCityDistanceTime *= -1
+			}
 
-		if oldDataCityDistanceTime > newDataCityDistanceTime || citiesDistance[v.City].Timestamp == 0 {
-			citiesDistance[v.City] = v
+			if oldDataCityDistanceTime > newDataCityDistanceTime || citiesDistance[v.City].Timestamp == 0 {
+				citiesDistance[v.City] = v
+			}
+
+		} else {
+			makeDifferenceBetweenCities++
+			cityID := strconv.Itoa(makeDifferenceBetweenCities)
+			citiesDistance[cityID] = v
 		}
 	}
 	return citiesDistance
@@ -619,12 +583,10 @@ func DistanceCounter(ProcessorNumber int, coordinate cityStructs.CoordinateAndTi
 	// because of the append we need to declare here by make
 	result := make(map[string]float64)
 
-	///////Todo buffer annyi legyen mint ahany csatorna van (ready)
 	//make channel
 	in := make(chan cityStructs.CityInfo, len(filteredCities))
 	out := make(chan cityStructs.Out, len(filteredCities))
 
-	//////Todo megadhato proc szam (configbol) (ready)
 	//make processor
 	for i := 0; i < ProcessorNumber; i++ {
 		go DistanceCounterProcess(in, coordinate, out, &wg)
@@ -740,25 +702,51 @@ func filteredCitiesByTime(cities []cityStructs.CityData, timestamp int64) (resul
 	filteredCitiesbyDistance := make(map[string]cityStructs.CityData)
 	timestampToInt := int(timestamp)
 
+	makeDifferenceBetweenCities := 0
+
 	for _, v := range cities {
 
-		cityID := strconv.Itoa(v.CityID)
+		if Config.FilteringCityData {
 
-		var cityDistanceTimestamp = int(filteredCitiesbyDistance[cityID].Date)
+			cityID := strconv.Itoa(v.CityID)
 
-		oldDataCityDistanceTime := cityDistanceTimestamp - timestampToInt
-		if oldDataCityDistanceTime < 0 {
-			oldDataCityDistanceTime *= -1
-		}
+			var cityDistanceTimestamp = int(filteredCitiesbyDistance[cityID].Date)
 
-		newDataCityDistanceTime := v.Date - timestampToInt
-		if newDataCityDistanceTime < 0 {
-			newDataCityDistanceTime *= -1
-		}
+			oldDataCityDistanceTime := cityDistanceTimestamp - timestampToInt
+			if oldDataCityDistanceTime < 0 {
+				oldDataCityDistanceTime *= -1
+			}
 
-		if oldDataCityDistanceTime > newDataCityDistanceTime || filteredCitiesbyDistance[cityID].Date == 0 {
+			newDataCityDistanceTime := v.Date - timestampToInt
+			if newDataCityDistanceTime < 0 {
+				newDataCityDistanceTime *= -1
+			}
+
+			if oldDataCityDistanceTime > newDataCityDistanceTime || filteredCitiesbyDistance[cityID].Date == 0 {
+				filteredCitiesbyDistance[cityID] = v
+			}
+		} else {
+			makeDifferenceBetweenCities++
+			cityID := strconv.Itoa(makeDifferenceBetweenCities)
 			filteredCitiesbyDistance[cityID] = v
 		}
 	}
 	return filteredCitiesbyDistance
+}
+
+
+func stringToFloatArray(string string)(result [5]float64){
+
+	// Rain and Temp data is in a string first split up,
+	SplitString := strings.SplitN(string, ",", 5)
+
+	var stringToFloat = [5]float64{}
+
+	// convert Temp data to float and put into array
+	for i, v := range SplitString {
+		f, _ := strconv.ParseFloat(v, 64)
+		stringToFloat[i] = f
+	}
+
+	return stringToFloat
 }
