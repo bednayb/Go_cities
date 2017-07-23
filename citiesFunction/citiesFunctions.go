@@ -48,7 +48,7 @@ func Init(configFile string) {
 
 	file, _ := os.Open("./config/" + configFile + ".json")
 	decoder := json.NewDecoder(file)
-	//configuration := cityStructs.Configuration{}
+
 	err := decoder.Decode(&Config)
 	if err != nil {
 		fmt.Println("error:", err)
@@ -166,27 +166,8 @@ func PostCity(c *gin.Context) {
 			panic(err.Error()) // proper error handling instead of panic in your app
 		}
 
-		tempData := json.Temp
-		var tempDataToSQL string
-		for i, v := range tempData {
-			s := strconv.FormatFloat(v, 'f', -1, 64)
-			if i != len(tempData)-1 {
-				tempDataToSQL += s + ","
-			} else {
-				tempDataToSQL += s
-			}
-		}
-
-		rainData := json.Rain
-		var rainDataToSQL string
-		for i, v := range rainData {
-			s := strconv.FormatFloat(v, 'f', -1, 64)
-			if i != len(tempData)-1 {
-				rainDataToSQL += s + ","
-			} else {
-				rainDataToSQL += s
-			}
-		}
+		tempDataToSQL := FloatArrayConvertToString(json.Temp)
+		rainDataToSQL := FloatArrayConvertToString(json.Rain)
 
 		res, err := stmt.Exec(cityID, json.Timestamp, tempDataToSQL, rainDataToSQL, json.Geo.Lat, json.Geo.Lng)
 		if err != nil {
@@ -369,30 +350,26 @@ func GetExpectedForecast(c *gin.Context) {
 	var citiesDistance map[string]float64
 	var filteredCitiesByTimeForCalculate map[string]cityStructs.CityInfo
 
-	if Config.MySQL {
-		cities := CitiesFromSQL()
-
-		filteredCitiesByTimeNotMap := filteredCitiesByTime(cities, timestampConvertToInt)
-		filteredCitiesByTimeForCalculate = CitiesDataConvertToMap(filteredCitiesByTimeNotMap)
-
-	} else {
-		// filter for the nearest data (by timestamp)
-		filteredCitiesByTimeForCalculate = NearestCityDataInTime(CityDatabase, timestampConvertToInt)
+	// Using sql database
+	if Config.Database.MySQL {
+		CityDatabase = CitiesFromSQL()
 	}
+
+	// filter for the nearest data (by timestamp)
+	filteredCitiesByTimeForCalculate = NearestCityDataInTime(CityDatabase, timestampConvertToInt)
+
 	// count all distance with channels
 	citiesDistance = DistanceCounter(Config.ProcessorNumber, presentData, filteredCitiesByTimeForCalculate)
 	// balanced the distances
 	var balancedDistanceByLinearInterpolation map[string]float64
 
-	if Config.BalancedByDistance {
-
+	if Config.Calculation.BalancedByDistance {
 		balancedDistanceByLinearInterpolation = BalancedDistanceByLinearInterpolation(citiesDistance)
 	} else {
-
 		balancedDistanceByLinearInterpolation = citiesDistance
 	}
-	// counting temps and raining data for next 5 days
 
+	// counting temps and raining data for next 5 days
 	wg.Add(2)
 	var forecastRain []float64
 	var forecastCelsius []float64
@@ -507,7 +484,7 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 
 	for _, v := range allCities {
 
-		if Config.FilteringCityData {
+		if Config.Calculation.FilteringCityData {
 			oldDataCityDistanceTime := citiesDistance[v.City].Timestamp - timestamp
 			if oldDataCityDistanceTime < 0 {
 				oldDataCityDistanceTime *= -1
@@ -532,36 +509,35 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 }
 
 //CitiesFromSQL make a query to database for cities
-func CitiesFromSQL() (cities []cityStructs.CityData) {
+func CitiesFromSQL() (cities []cityStructs.CityInfo) {
 
-	// open SQL
-	db, err := sql.Open("mysql",Config.Database.Username+":"+Config.Database.Password+"@/"+Config.Database.Name )
-	if err != nil {
-		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
-	}
+		// open SQL
+		db, err := sql.Open("mysql",Config.Database.Username+":"+Config.Database.Password+"@/"+Config.Database.Name )
+		if err != nil {
+			panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+		}
+		defer db.Close()
+		rows, err := db.Query("SELECT CityName,Latitude,Longitude,Temp,Rain,Date FROM City INNER JOIN CityInfo ON City.ID = CityInfo.CityID ")
+		if err != nil {
+			panic(err.Error()) // proper error handling instead of panic in your app
+		}
 
-	defer db.Close()
+		// cities container
+		for rows.Next() {
+			var CityName string
+			var Latitude float64
+			var Longitude float64
+			var Temp string
+			var Rain string
+			var Date int64
 
-	rows, err := db.Query("select * from CityInfo")
+			rows.Scan(&CityName, &Latitude, &Longitude, &Temp, &Rain, &Date)
 
-	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-	}
+			RainData := stringToFloatArray(Rain)
+			TempData := stringToFloatArray(Temp)
 
-	for rows.Next() {
-
-		var InfoID int
-		var CityID int
-		var Date int
-		var Temp string
-		var Rain string
-		var Latitude float64
-		var Longitude float64
-
-		rows.Scan(&InfoID, &CityID, &Date, &Temp, &Rain, &Latitude, &Longitude)
-		// add every row to cities
-		cities = append(cities, cityStructs.CityData{CityID, InfoID, Date, Temp, Rain, cityStructs.Geo{Latitude, Longitude}})
-	}
+			cities = append(cities, cityStructs.CityInfo{CityName, cityStructs.Geo{Latitude, Longitude}, TempData, RainData, Date})
+		}
 
 	return cities
 }
@@ -620,45 +596,6 @@ func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs
 	}
 }
 
-//CitiesDataConvertToMap change sql data format
-func CitiesDataConvertToMap(filteredCitiesFromSQLDb map[string]cityStructs.CityData) (filteredCitiesResult map[string]cityStructs.CityInfo) {
-
-	filteredCities := make(map[string]cityStructs.CityInfo)
-
-	for _, v := range filteredCitiesFromSQLDb {
-
-		// cityID is a unique data, --> use for key value
-		// convert int to string
-		cityID := strconv.Itoa(v.CityID)
-
-		// Rain and Temp data is in a string first split up,
-		stringSliceTemp := strings.SplitN(v.Temp, ",", 5)
-		stringSliceRain := strings.SplitN(v.Rain, ",", 5)
-
-		var stringToFloatTemp = [5]float64{}
-		var stringToFloatRain = [5]float64{}
-
-		// convert Temp data to float and put into array
-		for i, v := range stringSliceTemp {
-			f, _ := strconv.ParseFloat(v, 64)
-			stringToFloatTemp[i] = f
-		}
-		// convert Rain data to float and put into array
-		for i, v := range stringSliceRain {
-			f, _ := strconv.ParseFloat(v, 64)
-			stringToFloatRain[i] = f
-		}
-		// cut off Geo data to decimal
-		truncatedLatitude := float64(int(v.Geo.Lat*100)) / 100
-		truncatedLongtitude := float64(int(v.Geo.Lng*100)) / 100
-
-		date := int64(v.Date)
-
-		filteredCities[cityID] = cityStructs.CityInfo{cityID, cityStructs.Geo{truncatedLatitude, truncatedLongtitude}, stringToFloatTemp, stringToFloatRain, date}
-	}
-	return filteredCities
-}
-
 func checkDataExist(lat string, lng string, timestamp string) (dataDoesntExistsMessage string) {
 
 	if lat == "" {
@@ -689,42 +626,6 @@ func checkConverting(lat string, latitudeConvertToFloat64 float64, lng string, l
 	return convertProblem
 }
 
-func filteredCitiesByTime(cities []cityStructs.CityData, timestamp int64) (result map[string]cityStructs.CityData) {
-	filteredCitiesbyDistance := make(map[string]cityStructs.CityData)
-	timestampToInt := int(timestamp)
-
-	makeDifferenceBetweenCities := 0
-
-	for _, v := range cities {
-
-		if Config.FilteringCityData {
-
-			cityID := strconv.Itoa(v.CityID)
-
-			var cityDistanceTimestamp = int(filteredCitiesbyDistance[cityID].Date)
-
-			oldDataCityDistanceTime := cityDistanceTimestamp - timestampToInt
-			if oldDataCityDistanceTime < 0 {
-				oldDataCityDistanceTime *= -1
-			}
-
-			newDataCityDistanceTime := v.Date - timestampToInt
-			if newDataCityDistanceTime < 0 {
-				newDataCityDistanceTime *= -1
-			}
-
-			if oldDataCityDistanceTime > newDataCityDistanceTime || filteredCitiesbyDistance[cityID].Date == 0 {
-				filteredCitiesbyDistance[cityID] = v
-			}
-		} else {
-			makeDifferenceBetweenCities++
-			cityID := strconv.Itoa(makeDifferenceBetweenCities)
-			filteredCitiesbyDistance[cityID] = v
-		}
-	}
-	return filteredCitiesbyDistance
-}
-
 
 func stringToFloatArray(string string)(result [5]float64){
 
@@ -740,4 +641,17 @@ func stringToFloatArray(string string)(result [5]float64){
 	}
 
 	return stringToFloat
+}
+
+func FloatArrayConvertToString(jsonData [5]float64)(dataForSQL string){
+
+	for i, v := range  jsonData {
+		s := strconv.FormatFloat(v, 'f', -1, 64)
+		if i != len(jsonData)-1 {
+			dataForSQL += s + ","
+		} else {
+			dataForSQL += s
+		}
+	}
+	return dataForSQL
 }
