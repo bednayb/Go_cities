@@ -1,5 +1,9 @@
 {
     "Type":"development",
+    "MySQL": true,
     "Database": "mockDatabase",
-    "ProcessorNumber": 5
+    "ProcessorNumber": 13,
+    "Port": "8080",
+    "FilteringCityData": true,
+    "BalancedByDistance": true
 }
