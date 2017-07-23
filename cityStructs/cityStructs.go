@@ -43,8 +43,12 @@ type CityBasicData struct {
 // Configuration file structure
 type Configuration struct {
 	Type            string
+	MySQL bool
 	Database        string
 	ProcessorNumber int
+	Port string
+	FilteringCityData bool
+	BalancedByDistance bool
 }
 
 //Out is necessary to not send back map because, if one goroutine is writing to a map, no other goroutine should be reading or writing the map concurrently. If the runtime detects this condition, it prints a diagnosis and crashes the program. (https://golang.org/doc/go1.6#runtime)
