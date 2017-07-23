@@ -25,21 +25,6 @@ type Geo struct {
 	Lng float64
 }
 
-// CityData  contains cityInfo data from slq db
-type CityData struct {
-	CityID    int  `json:"City"`
-	InfoID    int
-	Date      int	`json:"Timestamp"`
-	Temp      string
-	Rain      string
-	Geo 		Geo
-}
-//CityBasicData contains just name and id
-type CityBasicData struct {
-	CityID   int
-	CityName string
-}
-
 // Configuration file structure
 type Configuration struct {
 	Type            string
@@ -48,6 +33,18 @@ type Configuration struct {
 	Database        Database
 	ProcessorNumber int
 	Port string
+	Calculation Calculation
+	FilteringCityData bool
+	BalancedByDistance bool
+}
+
+type Database struct {
+	Name string
+	MySQL bool
+	Username string
+	Password string
+}
+type Calculation struct {
 	FilteringCityData bool
 	BalancedByDistance bool
 }
@@ -56,11 +53,4 @@ type Configuration struct {
 type Out struct {
 	CityName string
 	Distance float64
-}
-
-type Database struct {
-	Name string
-	MySQL bool
-	Username string
-	Password string
 }
