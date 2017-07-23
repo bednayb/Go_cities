@@ -1,5 +1,5 @@
 package main
-// TODO a main go a főkönyvtárvban szokott lenni általában (ready)
+
 import (
 	"github.com/bednayb/Go_cities/citiesFunction"
 	"github.com/gin-gonic/gin"
@@ -11,10 +11,6 @@ import (
 
 func main() {
 
-	// if you want to use mock data  run go run main.go -config development (or just go run main.go)
-	// if you want to use test data  run go run main.go -config test
-	// if you want to use production data  run go run main.go -config production
-	// if you want to use sql database  run go run main.go -config production mysql
 
 	var configFile string
 	citiesFunction.ConfigSettings(&configFile)
