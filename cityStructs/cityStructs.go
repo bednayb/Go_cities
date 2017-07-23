@@ -39,10 +39,11 @@ type Configuration struct {
 }
 
 type Database struct {
-	Name string
 	MySQL bool
+	Name string
 	Username string
 	Password string
+	MockDatabaseName string
 }
 type Calculation struct {
 	FilteringCityData bool
