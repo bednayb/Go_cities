@@ -1,11 +1,11 @@
 {
     "Type":"development",
-    "Name":"mockDatabase",
     "Database": {
-        "Name": "GoCities",
         "MySQL": true,
+        "Name": "GoCities",
         "Username":"",
-        "Password":""
+        "Password":"",
+        "MockDatabaseName":"mockDatabase"
     },
     "ProcessorNumber": 5,
     "Port": "8080",
