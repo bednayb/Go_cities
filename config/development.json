@@ -1,9 +1,16 @@
 {
     "Type":"development",
-    "MySQL": true,
-    "Database": "mockDatabase",
-    "ProcessorNumber": 13,
+    "Name":"mockDatabase",
+    "Database": {
+        "Name": "GoCities",
+        "MySQL": true,
+        "Username":"",
+        "Password":""
+    },
+    "ProcessorNumber": 5,
     "Port": "8080",
-    "FilteringCityData": true,
-    "BalancedByDistance": true
+    "Calculation":{
+        "FilteringCityData": true,
+        "BalancedByDistance": true
+    }
 }
