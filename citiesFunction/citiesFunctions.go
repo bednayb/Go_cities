@@ -33,14 +33,8 @@ func ConfigSettings(configFile *string) {
 
 	var config = flag.String("config", "", "placeholder")
 	flag.Parse()
-	switch *config {
-	case "production":
-		*configFile = "production"
-	case "test":
-		*configFile = "test"
-	default:
-		*configFile = "development"
-	}
+
+	*configFile = *config
 }
 
 // Init before run the program settings config contents
@@ -271,36 +265,43 @@ func GetCityByName(c *gin.Context) {
 
 			cities = append(cities, cityStructs.CityInfo{CityName, cityStructs.Geo{Latitude, Longitude}, TempData, RainData, Date})
 		}
-		c.JSON(200, cities)
-	}
-	cities := CityDatabase
-	// find city's name from url
-	name := c.Params.ByName("name")
-	// bool for checking city is exist in our db
-	redFlag := true
-
-	// filtered cities order by timestamp (first the oldest)
-	var filteredCitiesByTime CitiesInfo
-
-	// filtering cities by name
-	for _, v := range cities {
-		if v.City == name {
-			redFlag = false
-			filteredCitiesByTime = append(filteredCitiesByTime, v)
+		if len(cities) == 0{
+			content := gin.H{"error": "city with name " + name + " not found"}
+			c.JSON(404, content)
+			return
 		}
-	}
-	if redFlag {
-		// response when city doesnt exist in our db
-		content := gin.H{"error": "city with name " + name + " not found"}
-		c.JSON(404, content)
+		c.JSON(200, cities)
+		return
+	}else {
+		cities := CityDatabase
+		// find city's name from url
+		name := c.Params.ByName("name")
+		// bool for checking city is exist in our db
+		redFlag := true
+
+		// filtered cities order by timestamp (first the oldest)
+		var filteredCitiesByTime CitiesInfo
+
+		// filtering cities by name
+		for _, v := range cities {
+			if v.City == name {
+				redFlag = false
+				filteredCitiesByTime = append(filteredCitiesByTime, v)
+			}
+		}
+		if redFlag {
+			// response when city doesnt exist in our db
+			content := gin.H{"error": "city with name " + name + " not found"}
+			c.JSON(404, content)
+			return
+		}
+
+		// sorting cities
+		sort.Sort(filteredCitiesByTime)
+		// response when city exist in our db
+		c.JSON(200, gin.H{"filteredCitiesByTime": filteredCitiesByTime})
 		return
 	}
-
-	// sorting cities
-	sort.Sort(filteredCitiesByTime)
-	// response when city exist in our db
-	c.JSON(200, gin.H{"filteredCitiesByTime": filteredCitiesByTime})
-	return
 }
 
 //GetExpectedForecast count the expected celsius and raining change for next five days
