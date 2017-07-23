@@ -43,8 +43,9 @@ type CityBasicData struct {
 // Configuration file structure
 type Configuration struct {
 	Type            string
+	Name  			string
 	MySQL bool
-	Database        string
+	Database        Database
 	ProcessorNumber int
 	Port string
 	FilteringCityData bool
@@ -55,4 +56,11 @@ type Configuration struct {
 type Out struct {
 	CityName string
 	Distance float64
+}
+
+type Database struct {
+	Name string
+	MySQL bool
+	Username string
+	Password string
 }
