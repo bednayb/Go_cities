@@ -48,22 +48,13 @@ func Init(configFile string) {
 
 	file, _ := os.Open("./config/" + configFile + ".json")
 	decoder := json.NewDecoder(file)
-	configuration := cityStructs.Configuration{}
-	err := decoder.Decode(&configuration)
+	//configuration := cityStructs.Configuration{}
+	err := decoder.Decode(&Config)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
 
-	Config.Type = configuration.Type
-	Config.MySQL = configuration.MySQL
-	Config.ProcessorNumber = configuration.ProcessorNumber
-	Config.Port = configuration.Port
-	Config.FilteringCityData = configuration.FilteringCityData
-	Config.Database = configuration.Database
-	Config.BalancedByDistance = configuration.BalancedByDistance
-	Config.FilteringCityData = configuration.FilteringCityData
-
-	switch configuration.Database {
+	switch Config.Name {
 	case "productionDatabase":
 		for i := 0; i < len(productionDatabase.Cities); i++ {
 			CityDatabase = append(CityDatabase, productionDatabase.Cities[i])
@@ -82,9 +73,9 @@ func Init(configFile string) {
 // GetAllCitySQL list all cities from SQL database
 func GetAllCity(c *gin.Context) {
 
-	if Config.MySQL {
+	if Config.Database.MySQL {
 
-		db, err := sql.Open("mysql", "root:admin@/GoCities")
+		db, err := sql.Open("mysql",Config.Database.Username+":"+Config.Database.Password+"@/"+Config.Database.Name )
 		if err != nil {
 			panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
 		}
@@ -122,7 +113,7 @@ func GetAllCity(c *gin.Context) {
 
 // PostCitySQL add new city to SQL database
 func PostCity(c *gin.Context) {
-	if Config.MySQL {
+	if Config.Database.MySQL {
 		var json cityStructs.CityInfo
 		c.Bind(&json) // This will infer what binder to use depending on the content-type header.
 
@@ -137,7 +128,7 @@ func PostCity(c *gin.Context) {
 		}
 
 		// open the database
-		db, err := sql.Open("mysql", "root:admin@/GoCities")
+		db, err := sql.Open("mysql",Config.Database.Username+":"+Config.Database.Password+"@/"+Config.Database.Name )
 		if err != nil {
 			panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
 		}
@@ -232,7 +223,7 @@ func DeleteCitySQL(c *gin.Context) {
 	CityID := c.Query("id")
 	CityIDConvertToInt, _ := strconv.ParseInt(CityID, 10, 64)
 
-	db, err := sql.Open("mysql", "root:admin@/GoCities")
+	db, err := sql.Open("mysql",Config.Database.Username+":"+Config.Database.Password+"@/"+Config.Database.Name )
 	if err != nil {
 		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
 	}
@@ -268,10 +259,10 @@ func DeleteCitySQL(c *gin.Context) {
 // GetCityByName shows every data where the city name is same (example: becs)
 func GetCityByName(c *gin.Context) {
 
-	if Config.MySQL {
+	if Config.Database.MySQL {
 		name := c.Params.ByName("name")
 
-		db, err := sql.Open("mysql", "root:admin@/GoCities")
+		db, err := sql.Open("mysql",Config.Database.Username+":"+Config.Database.Password+"@/"+Config.Database.Name )
 		if err != nil {
 			panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
 		}
@@ -544,7 +535,7 @@ func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (f
 func CitiesFromSQL() (cities []cityStructs.CityData) {
 
 	// open SQL
-	db, err := sql.Open("mysql", "root:admin@/GoCities")
+	db, err := sql.Open("mysql",Config.Database.Username+":"+Config.Database.Password+"@/"+Config.Database.Name )
 	if err != nil {
 		panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
 	}
