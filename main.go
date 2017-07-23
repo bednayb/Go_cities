@@ -7,13 +7,20 @@ import (
 	"log"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"os"
 )
 
 func main() {
 
-
 	var configFile string
+
 	citiesFunction.ConfigSettings(&configFile)
+
+	// check file exist, if not change to default config mode
+	if _, err := os.Stat("./config/" + configFile + ".json"); os.IsNotExist(err) {
+		// path/to/whatever does not exist
+		configFile = "development"
+	}
 
 	//Set config file path including file name and extension
 	viper.SetConfigFile("./config/"+ configFile +".json")
