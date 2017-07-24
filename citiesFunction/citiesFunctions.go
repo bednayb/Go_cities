@@ -48,6 +48,7 @@ func Init(configFile string) {
 		fmt.Println("error:", err)
 	}
 
+	//Todo find better solution than switch
 	switch Config.Name {
 	case "productionDatabase":
 		for i := 0; i < len(productionDatabase.Cities); i++ {
@@ -68,36 +69,7 @@ func Init(configFile string) {
 func GetAllCity(c *gin.Context) {
 
 	if Config.Database.MySQL {
-
-		db, err := sql.Open("mysql",Config.Database.Username+":"+Config.Database.Password+"@/"+Config.Database.Name )
-		if err != nil {
-			panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
-		}
-		defer db.Close()
-		rows, err := db.Query("SELECT CityName,Latitude,Longitude,Temp,Rain,Date FROM City INNER JOIN CityInfo ON City.ID = CityInfo.CityID ")
-		if err != nil {
-			panic(err.Error()) // proper error handling instead of panic in your app
-		}
-
-		// cities container
-		var cities cityStructs.CitiesInfo
-
-		for rows.Next() {
-			var CityName string
-			var Latitude float64
-			var Longitude float64
-			var Temp string
-			var Rain string
-			var Date int64
-
-			rows.Scan(&CityName, &Latitude, &Longitude, &Temp, &Rain, &Date)
-
-			RainData := stringToFloatArray(Rain)
-			TempData := stringToFloatArray(Temp)
-
-			cities = append(cities, cityStructs.CityInfo{CityName, cityStructs.Geo{Latitude, Longitude}, TempData, RainData, Date})
-		}
-
+		cities := CitiesFromSQL()
 		c.JSON(200, cities)
 	} else {
 		cities := CityDatabase
@@ -277,19 +249,10 @@ func GetCityByName(c *gin.Context) {
 		// find city's name from url
 		name := c.Params.ByName("name")
 		// bool for checking city is exist in our db
-		redFlag := true
 
-		// filtered cities order by timestamp (first the oldest)
-		var filteredCitiesByTime CitiesInfo
+		filteredCitiesByName := FilterCitiesByName(cities, name)
 
-		// filtering cities by name
-		for _, v := range cities {
-			if v.City == name {
-				redFlag = false
-				filteredCitiesByTime = append(filteredCitiesByTime, v)
-			}
-		}
-		if redFlag {
+		if len(filteredCitiesByName) == 0 {
 			// response when city doesnt exist in our db
 			content := gin.H{"error": "city with name " + name + " not found"}
 			c.JSON(404, content)
@@ -297,11 +260,23 @@ func GetCityByName(c *gin.Context) {
 		}
 
 		// sorting cities
-		sort.Sort(filteredCitiesByTime)
+		sort.Sort(filteredCitiesByName)
 		// response when city exist in our db
-		c.JSON(200, gin.H{"filteredCitiesByTime": filteredCitiesByTime})
+		c.JSON(200, gin.H{"filteredCitiesByTime": filteredCitiesByName})
 		return
 	}
+}
+
+func (slice CitiesInfo) Len() int {
+	return len(slice)
+}
+
+func (slice CitiesInfo) Less(i, j int) bool {
+	return slice[i].Timestamp < slice[j].Timestamp
+}
+
+func (slice CitiesInfo) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
 }
 
 //GetExpectedForecast count the expected celsius and raining change for next five days
@@ -465,17 +440,6 @@ func CalculateTemp(balancedCityDistance map[string]float64, cityInfo map[string]
 	databaseWaitGroup.Done()
 }
 
-func (slice CitiesInfo) Len() int {
-	return len(slice)
-}
-
-func (slice CitiesInfo) Less(i, j int) bool {
-	return slice[i].Timestamp < slice[j].Timestamp
-}
-
-func (slice CitiesInfo) Swap(i, j int) {
-	slice[i], slice[j] = slice[j], slice[i]
-}
 
 // NearestCityDataInTime is a filter where we get back just one city (exm if we have 3 becs back just one) which is the most relevant by time
 func NearestCityDataInTime(allCities []cityStructs.CityInfo, timestamp int64) (filteredCities map[string]cityStructs.CityInfo) {
@@ -655,4 +619,14 @@ func FloatArrayConvertToString(jsonData [5]float64)(dataForSQL string){
 		}
 	}
 	return dataForSQL
+}
+
+func FilterCitiesByName(cities []cityStructs.CityInfo, name string)(filteredCities CitiesInfo){
+
+	for _, v := range cities {
+		if v.City == name {
+			filteredCities = append(filteredCities, v)
+		}
+	}
+	return filteredCities
 }
