@@ -65,7 +65,7 @@ func main() {
 		v1.POST("/v1/push", citiesFunction.PostCity)
 
 		// add new city SQL
-		v1.DELETE("/sql/delete", citiesFunction.DeleteCitySQL)
+		v1.DELETE("/v1/delete", citiesFunction.DeleteCitySQL)
 	}
 	r.Run(":"+citiesFunction.Config.Port)
 }
