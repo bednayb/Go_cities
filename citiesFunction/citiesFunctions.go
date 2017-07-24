@@ -176,12 +176,7 @@ func DeleteCitySQL(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// delete (delete city's info)
-	stmt, err := db.Prepare("DELETE CityInfo FROM City INNER JOIN CityInfo WHERE CityId=? AND City.ID = CityInfo.CityId")
-	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
-	}
-	//stmt, err = db.Prepare("DELETE FROM City WHERE ID=?" )
+	stmt, err := db.Prepare("DELETE FROM City WHERE ID=?" )
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
@@ -200,7 +195,6 @@ func DeleteCitySQL(c *gin.Context) {
 		c.JSON(200, "delete was successful")
 		return
 	}
-	c.JSON(200, res)
 }
 
 // GetCityByName shows every data where the city name is same (example: becs)
@@ -232,8 +226,8 @@ func GetCityByName(c *gin.Context) {
 
 			rows.Scan(&CityName, &Latitude, &Longitude, &Temp, &Rain, &Date)
 
-			RainData := stringToFloatArray(Rain)
-			TempData := stringToFloatArray(Temp)
+			RainData := StringToFloatArray(Rain)
+			TempData := StringToFloatArray(Temp)
 
 			cities = append(cities, cityStructs.CityInfo{CityName, cityStructs.Geo{Latitude, Longitude}, TempData, RainData, Date})
 		}
@@ -293,7 +287,7 @@ func GetExpectedForecast(c *gin.Context) {
 	lng := c.Query("lng")
 	timestamp := c.Query("timestamp")
 
-	dataDoesntExistsMessage := checkDataExist(lat, lng, timestamp)
+	dataDoesntExistsMessage := CheckDataExist(lat, lng, timestamp)
 
 	if len(dataDoesntExistsMessage) > 0 {
 		content := gin.H{"error_message": dataDoesntExistsMessage}
@@ -306,7 +300,7 @@ func GetExpectedForecast(c *gin.Context) {
 	longitudeConvertToFloat64, _ := strconv.ParseFloat(strings.TrimSpace(lng), 64)
 	timestampConvertToInt, _ := strconv.ParseInt(timestamp, 10, 64)
 
-	convertProblem := checkConverting(lat, latitudeConvertToFloat64, lng, longitudeConvertToFloat64, timestamp, timestampConvertToInt)
+	convertProblem := CheckConverting(lat, latitudeConvertToFloat64, lng, longitudeConvertToFloat64, timestamp, timestampConvertToInt)
 
 	if len(convertProblem) > 0 {
 		content := gin.H{"error_message ": convertProblem}
@@ -326,7 +320,7 @@ func GetExpectedForecast(c *gin.Context) {
 	var citiesDistance map[string]float64
 	var filteredCitiesByTimeForCalculate map[string]cityStructs.CityInfo
 
-	// Using sql database
+	// Using sql database (depends on cingig file)
 	if Config.Database.MySQL {
 		CityDatabase = CitiesFromSQL()
 	}
@@ -498,8 +492,8 @@ func CitiesFromSQL() (cities []cityStructs.CityInfo) {
 
 			rows.Scan(&CityName, &Latitude, &Longitude, &Temp, &Rain, &Date)
 
-			RainData := stringToFloatArray(Rain)
-			TempData := stringToFloatArray(Temp)
+			RainData := StringToFloatArray(Rain)
+			TempData := StringToFloatArray(Temp)
 
 			cities = append(cities, cityStructs.CityInfo{CityName, cityStructs.Geo{Latitude, Longitude}, TempData, RainData, Date})
 		}
@@ -561,7 +555,7 @@ func DistanceCounterProcess(in chan cityStructs.CityInfo, coordinate cityStructs
 	}
 }
 
-func checkDataExist(lat string, lng string, timestamp string) (dataDoesntExistsMessage string) {
+func CheckDataExist(lat string, lng string, timestamp string) (dataDoesntExistsMessage string) {
 
 	if lat == "" {
 		dataDoesntExistsMessage += "lat data must be exists, "
@@ -575,7 +569,7 @@ func checkDataExist(lat string, lng string, timestamp string) (dataDoesntExistsM
 	return dataDoesntExistsMessage
 }
 
-func checkConverting(lat string, latitudeConvertToFloat64 float64, lng string, longitudeConvertToFloat64 float64, timestamp string, timestampConvertToInt int64) (convertProblem string) {
+func CheckConverting(lat string, latitudeConvertToFloat64 float64, lng string, longitudeConvertToFloat64 float64, timestamp string, timestampConvertToInt int64) (convertProblem string) {
 
 	if lat != "0" && latitudeConvertToFloat64 == 0 {
 		convertProblem += "invalid lat data (not number), "
@@ -592,7 +586,7 @@ func checkConverting(lat string, latitudeConvertToFloat64 float64, lng string, l
 }
 
 
-func stringToFloatArray(string string)(result [5]float64){
+func StringToFloatArray(string string)(result [5]float64){
 
 	// Rain and Temp data is in a string first split up,
 	SplitString := strings.SplitN(string, ",", 5)
