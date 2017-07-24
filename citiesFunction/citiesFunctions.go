@@ -24,6 +24,7 @@ type CitiesInfo []cityStructs.CityInfo
 
 // CityDatabase is collection of cities
 var CityDatabase CitiesInfo
+var CityDatabase2 CitiesInfo
 
 // ProcessorNumber declaration
 var Config cityStructs.Configuration
@@ -51,17 +52,11 @@ func Init(configFile string) {
 	//Todo find better solution than switch
 	switch Config.Name {
 	case "productionDatabase":
-		for i := 0; i < len(productionDatabase.Cities); i++ {
-			CityDatabase = append(CityDatabase, productionDatabase.Cities[i])
-		}
+			CityDatabase = productionDatabase.Cities
 	case "testDatabase":
-		for i := 0; i < len(testDatabase.Cities); i++ {
-			CityDatabase = append(CityDatabase, testDatabase.Cities[i])
-		}
+			CityDatabase = testDatabase.Cities
 	default:
-		for i := 0; i < len(mockDatabase.Cities); i++ {
-			CityDatabase = append(CityDatabase, mockDatabase.Cities[i])
-		}
+			CityDatabase =  mockDatabase.Cities
 	}
 }
 
@@ -75,6 +70,7 @@ func GetAllCity(c *gin.Context) {
 		cities := CityDatabase
 		c.JSON(200, cities)
 	}
+
 }
 
 // PostCitySQL add new city to SQL database
@@ -323,7 +319,12 @@ func GetExpectedForecast(c *gin.Context) {
 	// Using sql database (depends on cingig file)
 	if Config.Database.MySQL {
 		CityDatabase = CitiesFromSQL()
+		CityDatabase2 = NearestCities(c,timestampConvertToInt)
+		fmt.Println(CityDatabase2)
 	}
+
+
+
 
 	// filter for the nearest data (by timestamp)
 	filteredCitiesByTimeForCalculate = NearestCityDataInTime(CityDatabase, timestampConvertToInt)
@@ -623,4 +624,82 @@ func FilterCitiesByName(cities []cityStructs.CityInfo, name string)(filteredCiti
 		}
 	}
 	return filteredCities
+}
+
+
+func NearestCities(c *gin.Context, timestamp_int int64)(cities []cityStructs.CityInfo){
+
+		db, err := sql.Open("mysql",Config.Database.Username+":"+Config.Database.Password+"@/"+Config.Database.Name )
+		if err != nil {
+			panic(err.Error()) // Just for example purpose. You should use proper error handling instead of panic
+		}
+		defer db.Close()
+		rows1, err := db.Query("select CityId,Max(Date) from CityInfo where Date < 2400  Group by CityId")
+		if err != nil {
+			panic(err.Error()) // proper error handling instead of panic in your app
+		}
+		rows2, err := db.Query("select CityId,Min(Date) from CityInfo where Date > 2400  Group by CityId")
+		if err != nil {
+			panic(err.Error()) // proper error handling instead of panic in your app
+		}
+
+		for rows1.Next() {
+			var CityId int
+			var Date int
+
+			rows1.Scan(&CityId, &Date)
+			fmt.Println(CityId, Date)
+
+		}
+	fmt.Println("***")
+		for rows2.Next() {
+			var CityId int
+			var Date int
+
+			rows2.Scan(&CityId, &Date)
+			fmt.Println(CityId, Date)
+
+		}
+
+		fmt.Println(cities)
+
+		if len(cities) == 0{
+			content := gin.H{"error": "city with name not found"}
+			c.JSON(404, content)
+			return
+		}
+
+	return
+}
+
+func CreateNewDatabase(name string) *sql.DB {
+
+	db, err := sql.Open("mysql", Config.Database.Username+":"+Config.Database.Password+"@tcp(127.0.0.1:3306)/")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	_,err = db.Exec("CREATE DATABASE IF NOT EXISTS "+name)
+	if err != nil {
+		panic(err)
+	}
+
+	_,err = db.Exec("USE "+name)
+	if err != nil {
+		panic(err)
+	}
+
+	_,err = db.Exec("CREATE TABLE City ( ID int not null Auto_Increment, CityName varchar(255) not NUll, Primary Key(ID), UNIQUE KEY (CityName))")
+	if err != nil {
+		panic(err)
+	}
+
+	_,err = db.Exec("CREATE TABLE CityInfo ( InfoId int not null Auto_Increment, CityId int not NUll, Date int, Temp varchar(255), Rain varchar(255), Latitude float, Longitude float, Primary Key(InfoId), FOREIGN KEY (CityId) REFERENCES City(ID) on DELETE CASCADE )")
+	if err != nil {
+		panic(err)
+	}
+
+	defer db.Close()
+	return db
 }
